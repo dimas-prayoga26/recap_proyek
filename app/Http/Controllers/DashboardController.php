@@ -11,6 +11,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -175,19 +176,23 @@ class DashboardController extends Controller
             ->latest('id')
             ->limit(5)
             ->get()
-            ->map(fn (ProjectTransaction $transaction) => [
-                'date' => $transaction->recorded_at?->format('d/m/Y') ?? '-',
-                'day' => $this->dayName($transaction->recorded_at),
-                'name' => $transaction->workItem?->name ?? '-',
-                'area' => $transaction->projectArea?->name ?? $project->name,
-                'category' => $transaction->category?->name ?? '-',
-                'group' => $transaction->paymentGroup
-                    ? $transaction->paymentGroup->code.' - '.($transaction->payment_number ?? 1).'/'.($transaction->payment_total ?? $transaction->paymentGroup->total_terms ?? 1)
-                    : '-',
-                'type' => $transaction->type,
-                'amount' => $this->formatRupiah($transaction->amount),
-                'has_receipt' => $transaction->attachments->isNotEmpty(),
-            ]);
+            ->map(function (ProjectTransaction $transaction) use ($project) {
+                $attachment = $transaction->attachments->first();
+
+                return [
+                    'date' => $transaction->recorded_at?->format('d/m/Y') ?? '-',
+                    'day' => $this->dayName($transaction->recorded_at),
+                    'name' => $transaction->workItem?->name ?? '-',
+                    'area' => $transaction->projectArea?->name ?? $project->name,
+                    'category' => $transaction->category?->name ?? '-',
+                    'group' => $transaction->paymentGroup
+                        ? $transaction->paymentGroup->code.' - '.($transaction->payment_number ?? 1).'/'.($transaction->payment_total ?? $transaction->paymentGroup->total_terms ?? 1)
+                        : '-',
+                    'type' => $transaction->type,
+                    'amount' => $this->formatRupiah($transaction->amount),
+                    'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : null,
+                ];
+            });
     }
 
     private function dayName(?CarbonInterface $date): string

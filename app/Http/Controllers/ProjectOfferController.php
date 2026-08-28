@@ -52,7 +52,7 @@ class ProjectOfferController extends Controller
         $filters['area'] = $filters['area'] ?? ($areas->firstWhere('code', 'K9')?->code ?? $areas->first()?->code ?? 'K9');
 
         $offers = ProjectOffer::query()
-            ->with(['workItem.packageItems.vendor'])
+            ->with(['vendor', 'workItem.packageItems.vendor'])
             ->when($project, fn ($query) => $query->where('project_id', $project->id))
             ->where('area', $filters['area'])
             ->when($filters['brand'] ?? null, fn ($query, string $brand) => $query->where('brand', $brand))
@@ -88,6 +88,7 @@ class ProjectOfferController extends Controller
             'projects' => $projects,
             'offers' => $offers,
             'areas' => $areas,
+            'vendors' => Vendor::query()->orderBy('name')->get(),
             'brands' => ProjectOffer::query()
                 ->when($project, fn ($query) => $query->where('project_id', $project->id))
                 ->where('area', $filters['area'])
@@ -110,7 +111,7 @@ class ProjectOfferController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'area' => ['required', 'string', 'max:20', Rule::notIn(['__new__'])],
             'pekerjaan' => ['required', 'string', 'max:255'],
-            'brand' => ['nullable', 'string', 'max:255'],
+            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
             'penawaran_rupiah' => ['nullable', 'integer', 'min:0', 'required_without:penawaran_usd'],
             'catatan' => ['nullable', 'string'],
@@ -142,12 +143,12 @@ class ProjectOfferController extends Controller
             ['project_id' => $project->id, 'code' => $validated['area']],
             ['name' => $project->name.' - '.$validated['area']],
         );
-        $primaryBrand = filled($validated['brand'] ?? null)
-            ? $validated['brand']
-            : $packageItems->pluck('brand')->first(fn (?string $brand): bool => filled($brand));
-        $vendor = filled($primaryBrand)
-            ? Vendor::firstOrCreate(['name' => $primaryBrand])
+        $vendor = filled($validated['vendor_id'] ?? null)
+            ? Vendor::query()->find($validated['vendor_id'])
             : null;
+        $fallbackBrand = $packageItems->pluck('brand')->first(fn (?string $brand): bool => filled($brand));
+        $vendor ??= filled($fallbackBrand) ? Vendor::firstOrCreate(['name' => $fallbackBrand]) : null;
+        $primaryBrand = $vendor?->name;
 
         DB::transaction(function () use ($validated, $project, $projectArea, $vendor, $primaryBrand, $packageItems, $isPackage): void {
             $workItemAttributes = [
@@ -205,7 +206,7 @@ class ProjectOfferController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'area' => ['required', 'string', 'max:20', Rule::notIn(['__new__'])],
             'pekerjaan' => ['required', 'string', 'max:255'],
-            'brand' => ['nullable', 'string', 'max:255'],
+            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
             'penawaran_rupiah' => ['nullable', 'integer', 'min:0', 'required_without:penawaran_usd'],
             'catatan' => ['nullable', 'string'],
@@ -237,12 +238,12 @@ class ProjectOfferController extends Controller
             ['project_id' => $project->id, 'code' => $validated['area']],
             ['name' => $project->name.' - '.$validated['area']],
         );
-        $primaryBrand = filled($validated['brand'] ?? null)
-            ? $validated['brand']
-            : $packageItems->pluck('brand')->first(fn (?string $brand): bool => filled($brand));
-        $vendor = filled($primaryBrand)
-            ? Vendor::firstOrCreate(['name' => $primaryBrand])
+        $vendor = filled($validated['vendor_id'] ?? null)
+            ? Vendor::query()->find($validated['vendor_id'])
             : null;
+        $fallbackBrand = $packageItems->pluck('brand')->first(fn (?string $brand): bool => filled($brand));
+        $vendor ??= filled($fallbackBrand) ? Vendor::firstOrCreate(['name' => $fallbackBrand]) : null;
+        $primaryBrand = $vendor?->name;
 
         DB::transaction(function () use ($projectOffer, $validated, $project, $projectArea, $vendor, $primaryBrand, $packageItems, $isPackage): void {
             if ($projectOffer->workItem) {

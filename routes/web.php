@@ -5,6 +5,7 @@ use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectOfferController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -12,6 +13,13 @@ Route::post('/dashboard/active-project', [DashboardController::class, 'updateAct
 
 Route::get('/project', [ProjectController::class, 'index'])->name('project.index');
 Route::post('/project', [ProjectController::class, 'store'])->name('project.store');
+Route::put('/project/{project}', [ProjectController::class, 'update'])->name('project.update');
+
+Route::get('/vendor', [VendorController::class, 'index'])->name('vendor.index');
+Route::post('/vendor', [VendorController::class, 'store'])->name('vendor.store');
+Route::put('/vendor/{vendor}', [VendorController::class, 'update'])->name('vendor.update');
+Route::post('/vendor/import', [VendorController::class, 'import'])->name('vendor.import');
+Route::get('/vendor/export', [VendorController::class, 'export'])->name('vendor.export');
 
 Route::redirect('/penawaran', '/kategori-pekerjaan');
 Route::get('/kategori-pekerjaan', [ProjectOfferController::class, 'index'])->name('kategori-pekerjaan.index');

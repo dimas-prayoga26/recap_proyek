@@ -155,6 +155,55 @@
       padding-top: 16px;
     }
 
+    .searchable-select {
+      position: relative;
+    }
+
+    .searchable-select-menu {
+      background: #fff;
+      border: 1px solid #e3e8ef;
+      border-radius: 8px;
+      box-shadow: 0 12px 24px rgba(16, 24, 40, 0.12);
+      display: none;
+      margin-top: 4px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 6px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      z-index: 20;
+    }
+
+    .searchable-select-menu.is-open {
+      display: block;
+    }
+
+    .searchable-select-item {
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      color: #202939;
+      display: block;
+      font-size: 14px;
+      padding: 8px 10px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .searchable-select-item:hover,
+    .searchable-select-item.is-active {
+      background: #eef6ff;
+      color: #2196f3;
+    }
+
+    .searchable-select-empty {
+      color: #697586;
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+
     @media (max-width: 991.98px) {
       .offer-filter-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -221,7 +270,7 @@
             <input type="hidden" name="_method" id="offer-form-method" value="" />
             <input type="hidden" name="is_package" id="is-package-input" value="0" />
             <div class="row">
-              <div class="col-md-6">
+              <div class="col-md-12">
                 <div class="mb-4">
                   <label for="project-select" class="form-label d-block">Project Holding</label>
                   <select class="form-select @error('project_id') is-invalid @enderror" id="project-select" name="project_id" required>
@@ -236,7 +285,7 @@
                   @enderror
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-6 d-none">
                 <div class="mb-4">
                   <label for="area-select" class="form-label d-block">Area / Kode</label>
                   <select class="form-select @error('area') is-invalid @enderror" id="area-select" name="area" required>
@@ -255,7 +304,7 @@
               </div>
             </div>
 
-            <div class="mb-4 form-check">
+            <div class="mb-4 form-check d-none">
               <input type="checkbox" class="form-check-input" id="package-toggle" />
               <label class="form-check-label" for="package-toggle">Ini paket gabungan beberapa area/pekerjaan (harga satu paket)</label>
             </div>
@@ -272,11 +321,21 @@
               </div>
               <div class="col-md-5" id="brand-field-wrapper">
                 <div class="mb-3">
-                  <label for="brand-name" class="form-label">Brand</label>
-                  <input type="text" class="form-control @error('brand') is-invalid @enderror" id="brand-name" name="brand" value="{{ old('brand') }}" placeholder="Contoh: Dedi Besi" />
-                  @error('brand')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                  <label for="vendor-search" class="form-label">Vendor</label>
+                  <div class="searchable-select js-searchable-select">
+                    <input type="text" class="form-control searchable-select-input @error('vendor_id') is-invalid @enderror" id="vendor-search" data-role="search-input" placeholder="Cari nama vendor..." autocomplete="off" />
+                    <div class="searchable-select-menu" data-role="menu"></div>
+                    <select class="form-select d-none" id="vendor-select" name="vendor_id" data-role="source">
+                      <option value="">-</option>
+                      @foreach (($vendors ?? collect()) as $vendorOption)
+                        <option value="{{ $vendorOption->id }}" @selected((int) old('vendor_id') === $vendorOption->id)>{{ $vendorOption->name }}</option>
+                      @endforeach
+                    </select>
+                  </div>
+                  @error('vendor_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
+                  <span class="form-helper">Belum ada vendornya? <a href="{{ route('vendor.index') }}">Tambah dulu</a> lewat menu Vendor.</span>
                 </div>
               </div>
             </div>
@@ -322,8 +381,8 @@
             </div>
 
             <div class="mb-4">
-              <label for="offer-notes" class="form-label">Catatan</label>
-              <textarea class="form-control @error('catatan') is-invalid @enderror" id="offer-notes" name="catatan" rows="3" placeholder="Contoh: Ongkos pasang, tambahan material, revisi penawaran">{{ old('catatan') }}</textarea>
+              <label for="offer-notes" class="form-label">Merk</label>
+              <input type="text" class="form-control @error('catatan') is-invalid @enderror" id="offer-notes" name="catatan" value="{{ old('catatan') }}" placeholder="Contoh: Dulux, Nippon Paint, Igloo" />
               @error('catatan')
                 <div class="invalid-feedback">{{ $message }}</div>
               @enderror
@@ -380,7 +439,7 @@
             <strong id="summary-work">Belum diisi</strong>
           </div>
           <div class="offer-summary-line">
-            <span>Brand</span>
+            <span>Vendor</span>
             <strong id="summary-brand">-</strong>
           </div>
           <div class="offer-summary-line">
@@ -418,7 +477,7 @@
                 id="filter-search"
                 name="search"
                 value="{{ $filters['search'] ?? '' }}"
-                placeholder="Pekerjaan, brand, atau catatan"
+                placeholder="Pekerjaan, vendor, atau merk"
               />
             </div>
             <div>
@@ -431,9 +490,9 @@
               </select>
             </div>
             <div>
-              <label for="filter-brand" class="form-label">Brand</label>
+              <label for="filter-brand" class="form-label">Vendor</label>
               <select class="form-select" id="filter-brand" name="brand">
-                <option value="">Semua Brand</option>
+                <option value="">Semua Vendor</option>
                 @foreach ($brands as $brand)
                   <option value="{{ $brand }}" @selected(($filters['brand'] ?? '') === $brand)>{{ $brand }}</option>
                 @endforeach
@@ -462,10 +521,10 @@
               <thead>
                 <tr>
                   <th>Pekerjaan</th>
-                  <th>Brand</th>
+                  <th>Vendor</th>
                   <th class="text-end">USD</th>
                   <th class="text-end">Rupiah</th>
-                  <th>Catatan</th>
+                  <th>Merk</th>
                   <th class="text-end">Aksi</th>
                 </tr>
               </thead>
@@ -486,7 +545,7 @@
                           </span>
                         @endif
                       </td>
-                      <td>{{ $offer->brand ?: '-' }}</td>
+                      <td>{{ $offer->vendor?->name ?? ($offer->brand ?: '-') }}</td>
                       <td class="text-end">{{ $offer->penawaran_usd ? 'USD '.number_format((float) $offer->penawaran_usd, 2, '.', ',') : '-' }}</td>
                       <td class="text-end">{{ $offer->penawaran_rupiah ? 'Rp '.number_format($offer->penawaran_rupiah, 0, ',', '.') : '-' }}</td>
                       <td>{{ $offer->catatan ?: '-' }}</td>
@@ -498,7 +557,7 @@
                           data-project-id="{{ $offer->project_id }}"
                           data-area="{{ $offer->area }}"
                           data-pekerjaan="{{ $offer->pekerjaan }}"
-                          data-brand="{{ $offer->brand }}"
+                          data-vendor-id="{{ $offer->vendor_id }}"
                           data-usd="{{ $offer->penawaran_usd }}"
                           data-rupiah="{{ $offer->penawaran_rupiah }}"
                           data-catatan="{{ $offer->catatan }}"
@@ -546,7 +605,7 @@
       const workInput = document.querySelector('#work-name');
       const workLabel = document.querySelector('#work-name-label');
       const workCol = document.querySelector('#work-name-col');
-      const brandInput = document.querySelector('#brand-name');
+      const vendorSelect = document.querySelector('#vendor-select');
       const brandFieldWrapper = document.querySelector('#brand-field-wrapper');
       const usdInput = document.querySelector('#offer-usd');
       const idrInput = document.querySelector('#offer-idr');
@@ -566,6 +625,96 @@
       const submitBtn = document.querySelector('#offer-submit-btn');
       const cancelEditBtn = document.querySelector('#offer-cancel-edit');
 
+      function enhanceSearchableSelect(wrapper) {
+        const select = wrapper.querySelector('[data-role="source"]');
+        const input = wrapper.querySelector('[data-role="search-input"]');
+        const menu = wrapper.querySelector('[data-role="menu"]');
+
+        function options() {
+          return Array.from(select.options).filter(function (option) {
+            return option.value !== '';
+          });
+        }
+
+        function selectedLabel() {
+          const option = select.options[select.selectedIndex];
+          return option && option.value !== '' ? option.textContent.trim() : '';
+        }
+
+        function syncInputFromSelect() {
+          input.value = selectedLabel();
+          input.classList.remove('is-invalid');
+        }
+
+        function closeMenu() {
+          menu.classList.remove('is-open');
+        }
+
+        function renderMenu(term) {
+          const query = (term || '').toLowerCase();
+          const matches = options().filter(function (option) {
+            return option.textContent.toLowerCase().includes(query);
+          });
+
+          menu.innerHTML = '';
+
+          if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-select-empty';
+            empty.textContent = 'Tidak ditemukan';
+            menu.appendChild(empty);
+            return;
+          }
+
+          matches.forEach(function (option) {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'searchable-select-item' + (option.value === select.value ? ' is-active' : '');
+            item.textContent = option.textContent.trim();
+
+            item.addEventListener('mousedown', function (event) {
+              event.preventDefault();
+              select.value = option.value;
+              syncInputFromSelect();
+              closeMenu();
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            menu.appendChild(item);
+          });
+        }
+
+        function openMenu() {
+          renderMenu('');
+          menu.classList.add('is-open');
+        }
+
+        input.addEventListener('focus', function () {
+          input.value = '';
+          openMenu();
+        });
+
+        input.addEventListener('input', function () {
+          renderMenu(input.value);
+          menu.classList.add('is-open');
+        });
+
+        input.addEventListener('blur', function () {
+          setTimeout(function () {
+            syncInputFromSelect();
+            closeMenu();
+          }, 120);
+        });
+
+        select.addEventListener('change', syncInputFromSelect);
+
+        syncInputFromSelect();
+
+        return { sync: syncInputFromSelect };
+      }
+
+      const vendorSearchableSelect = enhanceSearchableSelect(vendorSelect.closest('.js-searchable-select'));
+
       let lastValidAreaValue = areaSelect.value;
 
       function refreshPackageRowNames() {
@@ -580,7 +729,7 @@
         row.className = 'package-row';
         row.innerHTML =
           '<input type="text" class="form-control package-row-area" placeholder="Nama area, contoh: Ruang Kerja" />'
-          + '<input type="text" class="form-control package-row-material" placeholder="Brand/vendor, contoh: Build Dec Interior" />'
+          + '<input type="text" class="form-control package-row-material" placeholder="Vendor, contoh: Build Dec Interior" />'
           + '<button type="button" class="btn btn-light-secondary package-row-remove"><i class="ti ti-trash"></i></button>';
 
         row.querySelector('.package-row-remove').addEventListener('click', function () {
@@ -645,6 +794,11 @@
         return Number(value || 0) > 0 ? 'USD ' + usdFormatter.format(Number(value)) : '-';
       }
 
+      function selectedVendorName() {
+        const option = vendorSelect.selectedOptions[0];
+        return option && option.value !== '' ? option.textContent.trim() : '';
+      }
+
       function updateSummary() {
         const firstPackageBrand = Array.from(packageRows.querySelectorAll('.package-row-material'))
           .map(function (input) { return input.value.trim(); })
@@ -653,15 +807,17 @@
         document.querySelector('#summary-area').textContent = selectedArea();
         document.querySelector('#summary-work').textContent = workInput.value.trim() || 'Belum diisi';
         document.querySelector('#summary-brand').textContent = packageToggle.checked
-          ? (firstPackageBrand || brandInput.value.trim() || '-')
-          : (brandInput.value.trim() || '-');
+          ? (firstPackageBrand || selectedVendorName() || '-')
+          : (selectedVendorName() || '-');
         document.querySelector('#summary-usd').textContent = formatUsd(usdInput.value);
         document.querySelector('#summary-idr').textContent = formatIdr(idrInput.value);
       }
 
-      [workInput, brandInput, usdInput, idrInput].forEach(function (input) {
+      [workInput, usdInput, idrInput].forEach(function (input) {
         input.addEventListener('input', updateSummary);
       });
+
+      vendorSelect.addEventListener('change', updateSummary);
 
       projectSelect.addEventListener('change', function () {
         window.location.href = '{{ route('kategori-pekerjaan.index') }}?project_id=' + encodeURIComponent(projectSelect.value);
@@ -774,7 +930,8 @@
         areaSelect.value = data.area;
         projectSelect.value = data.projectId || projectSelect.value;
         lastValidAreaValue = data.area;
-        brandInput.value = data.brand || '';
+        vendorSelect.value = data.vendorId || '';
+        vendorSearchableSelect.sync();
         usdInput.value = data.usd || '';
         idrInput.value = data.rupiah || '';
         notesInput.value = data.catatan || '';
@@ -828,6 +985,7 @@
           packageRows.innerHTML = '';
           togglePackageMode(false);
           refreshPackageRowNames();
+          vendorSearchableSelect.sync();
           updateSummary();
         });
       });

@@ -32,6 +32,12 @@
             <span class="pc-mtext">Project Holding</span>
           </a>
         </li>
+        <li class="pc-item {{ request()->routeIs('vendor.*') ? 'active' : '' }}">
+          <a href="{{ route('vendor.index') }}" class="pc-link">
+            <span class="pc-micon"><i class="ti ti-truck-delivery"></i></span>
+            <span class="pc-mtext">Vendor</span>
+          </a>
+        </li>
         <li class="pc-item {{ request()->routeIs('kategori-pekerjaan.*') ? 'active' : '' }}">
           <a href="{{ route('kategori-pekerjaan.index') }}" class="pc-link">
             <span class="pc-micon"><i class="ti ti-businessplan"></i></span>
@@ -58,7 +64,7 @@
         <li class="pc-item {{ request()->routeIs('termin-pembayaran.*') ? 'active' : '' }}">
           <a href="{{ route('termin-pembayaran.index') }}" class="pc-link">
             <span class="pc-micon"><i class="ti ti-list-check"></i></span>
-            <span class="pc-mtext">Termin Pembayaran</span>
+            <span class="pc-mtext">Rekap Pembayaran</span>
           </a>
         </li>
       </ul>

@@ -410,7 +410,7 @@
             </div>
 
             <div class="row">
-              <div class="col-md-6">
+              <div class="col-md-12">
                 <div class="mb-3">
                   <label for="project-holding" class="form-label">Project Holding</label>
                   <select class="form-select @error('project_id') is-invalid @enderror" id="project-holding" name="project_id" required>
@@ -427,7 +427,7 @@
                   @enderror
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-6 d-none">
                 <div class="mb-3">
                   <label for="main-category" class="form-label">Area / Kode</label>
                   <select class="form-select @error('project_area_id') is-invalid @enderror" id="main-category" name="project_area_id" required>
@@ -565,7 +565,7 @@
               <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Tambahan detail transaksi bila diperlukan">{{ old('notes') }}</textarea>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-4 d-none">
               <label class="form-label d-block">Termin Pembayaran</label>
               @unless ($isIncome)
                 <span class="form-helper mb-2">Jika disimpan dari Debit, nominal ini otomatis masuk ke rekap Termin Pembayaran.</span>
@@ -636,7 +636,7 @@
             @endunless
 
             <div class="mb-4">
-              <label class="form-label d-block">Bukti Transaksi</label>
+              <label class="form-label d-block">Bukti Transfer (Opsional)</label>
               <label class="receipt-upload" for="receipt-file">
                 <span class="avtar avtar-lg bg-light-primary">
                   <i class="ti ti-photo-plus text-primary"></i>
@@ -1257,11 +1257,22 @@
         receiptPreview.classList.add('is-visible');
 
         const compressedBlob = await compressImage(file);
-        const previewUrl = URL.createObjectURL(compressedBlob);
+        const compressedFile = new File(
+          [compressedBlob],
+          file.name.replace(/\.(jpg|jpeg)$/i, '') + '.jpg',
+          { type: 'image/jpeg', lastModified: Date.now() },
+        );
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(compressedFile);
+        receiptFileInput.files = dataTransfer.files;
+
+        const previewUrl = URL.createObjectURL(compressedFile);
 
         receiptImage.src = previewUrl;
-        receiptSize.textContent = 'Asli ' + sizeLabel(file.size) + ' | Resize ' + sizeLabel(compressedBlob.size);
-        document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedBlob.size);
+        receiptName.textContent = compressedFile.name;
+        receiptSize.textContent = 'Asli ' + sizeLabel(file.size) + ' | Resize ' + sizeLabel(compressedFile.size);
+        document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedFile.size);
       }
 
       function refreshAreasForProjectHolding() {

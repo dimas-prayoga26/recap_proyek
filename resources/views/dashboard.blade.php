@@ -380,8 +380,17 @@
                       </span>
                     </td>
                     <td>
-                      @if ($transaction['has_receipt'])
-                        <span class="badge bg-light-success text-success">JPEG</span>
+                      @if ($transaction['receipt_url'])
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-light-success receipt-action"
+                          data-bs-toggle="modal"
+                          data-bs-target="#receipt-preview-modal"
+                          data-receipt-url="{{ $transaction['receipt_url'] }}"
+                          data-receipt-title="{{ $transaction['name'] }}"
+                        >
+                          <i class="ti ti-photo"></i> Lihat
+                        </button>
                       @else
                         <span class="badge bg-light-secondary text-secondary">Belum Ada</span>
                       @endif
@@ -402,6 +411,19 @@
     </div>
   </div>
 
+  <div class="modal fade" id="receipt-preview-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="receipt-preview-title">Bukti Transaksi</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
+        </div>
+      </div>
+    </div>
+  </div>
 @endsection
 
 @push('scripts')
@@ -420,6 +442,16 @@
       }
 
       updateExportLinks();
+
+      const receiptPreviewImage = document.querySelector('#receipt-preview-image');
+      const receiptPreviewTitle = document.querySelector('#receipt-preview-title');
+
+      document.querySelectorAll('.receipt-action').forEach(function (button) {
+        button.addEventListener('click', function () {
+          receiptPreviewImage.src = button.dataset.receiptUrl;
+          receiptPreviewTitle.textContent = 'Bukti Transaksi - ' + (button.dataset.receiptTitle || '');
+        });
+      });
 
       new ApexCharts(document.querySelector('#cashflow-chart'), {
         chart: {
