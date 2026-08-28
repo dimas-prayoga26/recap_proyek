@@ -1,16 +1,22 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PaymentTermController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectOfferController;
+use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('dashboard');
-})->name('dashboard');
+Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+Route::post('/dashboard/active-project', [DashboardController::class, 'updateActiveProject'])->name('dashboard.active-project');
 
-Route::view('/project', 'pages.placeholder', [
-    'title' => 'Project / Kategori Utama',
-    'description' => 'Halaman master untuk memisahkan transaksi berdasarkan project, tim, atau kategori utama.',
-    'icon' => 'ti ti-folders',
-])->name('project.index');
+Route::get('/project', [ProjectController::class, 'index'])->name('project.index');
+Route::post('/project', [ProjectController::class, 'store'])->name('project.store');
+
+Route::redirect('/penawaran', '/kategori-pekerjaan');
+Route::get('/kategori-pekerjaan', [ProjectOfferController::class, 'index'])->name('kategori-pekerjaan.index');
+Route::post('/kategori-pekerjaan', [ProjectOfferController::class, 'store'])->name('kategori-pekerjaan.store');
+Route::put('/kategori-pekerjaan/{projectOffer}', [ProjectOfferController::class, 'update'])->name('kategori-pekerjaan.update');
 
 Route::view('/kategori', 'pages.placeholder', [
     'title' => 'Kategori Transaksi',
@@ -18,21 +24,14 @@ Route::view('/kategori', 'pages.placeholder', [
     'icon' => 'ti ti-tag',
 ])->name('kategori.index');
 
-Route::view('/uang-masuk', 'pages.transaction-form', [
-    'mode' => 'masuk',
-    'title' => 'Input Uang Masuk',
-])->name('uang-masuk.index');
+Route::get('/uang-masuk', [TransactionController::class, 'createIncome'])->name('uang-masuk.index');
 
-Route::view('/uang-keluar', 'pages.transaction-form', [
-    'mode' => 'keluar',
-    'title' => 'Input Uang Keluar',
-])->name('uang-keluar.index');
+Route::get('/uang-keluar', [TransactionController::class, 'createExpense'])->name('uang-keluar.index');
+Route::post('/transaksi', [TransactionController::class, 'store'])->name('transactions.store');
 
-Route::view('/kelompok-pembayaran', 'pages.placeholder', [
-    'title' => 'Kelompok Pembayaran',
-    'description' => 'Halaman untuk mengatur satu kuitansi yang dibagi menjadi beberapa termin pembayaran.',
-    'icon' => 'ti ti-list-check',
-])->name('kelompok-pembayaran.index');
+Route::redirect('/kelompok-pembayaran', '/termin-pembayaran')->name('kelompok-pembayaran.index');
+Route::get('/termin-pembayaran', [PaymentTermController::class, 'index'])->name('termin-pembayaran.index');
+Route::patch('/termin-pembayaran/{workItem}', [PaymentTermController::class, 'update'])->name('termin-pembayaran.update');
 
 Route::view('/bukti-transaksi', 'pages.placeholder', [
     'title' => 'Bukti Transaksi',

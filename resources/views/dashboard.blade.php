@@ -5,29 +5,39 @@
 
 @section('page_actions')
   <div class="dropdown project-switcher">
-    <input type="hidden" id="active-project" value="project-kemang" />
+    <input type="hidden" id="active-project" value="{{ $activeProject?->slug ?? '' }}" />
     <button class="btn project-switcher-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
       <span class="project-switcher-icon"><i class="ti ti-folders"></i></span>
       <span>
         <span class="project-switcher-label">Proyek Aktif</span>
-        <span class="project-switcher-name" id="active-project-name">Project Kemang</span>
+        <span class="project-switcher-name" id="active-project-name">{{ $activeProject?->name ?? 'Belum ada project' }}</span>
       </span>
     </button>
     <ul class="dropdown-menu dropdown-menu-end" id="project-menu">
-      <li>
-        <button class="dropdown-item project-option active" type="button" data-project-value="project-kemang" data-project-name="Project Kemang">
-          <span class="project-option-check"><i class="ti ti-folder"></i></span>
-          <span class="project-option-copy">
-            <span class="project-option-title">Project Kemang</span>
-            <span class="project-option-meta">Saldo Rp 10,6 jt</span>
-          </span>
-        </button>
-      </li>
+      @forelse ($projects as $project)
+        <li>
+          <form method="POST" action="{{ route('dashboard.active-project') }}">
+            @csrf
+            <input type="hidden" name="project_id" value="{{ $project->id }}" />
+            <button class="dropdown-item project-option {{ $activeProject?->is($project) ? 'active' : '' }}" type="submit" data-project-value="{{ $project->slug }}" data-project-name="{{ $project->name }}">
+              <span class="project-option-check"><i class="ti ti-folder"></i></span>
+              <span class="project-option-copy">
+                <span class="project-option-title">{{ $project->name }}</span>
+                <span class="project-option-meta">Saldo {{ $projectBalances[$project->id] ?? 'Rp 0' }}</span>
+              </span>
+            </button>
+          </form>
+        </li>
+      @empty
+        <li>
+          <span class="dropdown-item text-muted">Project belum tersedia</span>
+        </li>
+      @endforelse
       <li id="project-divider"><hr class="dropdown-divider" /></li>
       <li>
-        <button class="dropdown-item project-add-option" type="button" id="open-project-modal">
+        <a class="dropdown-item project-add-option" href="{{ route('project.index') }}">
           <i class="ti ti-plus me-2"></i> Tambah Proyek Baru
-        </button>
+        </a>
       </li>
     </ul>
   </div>
@@ -52,6 +62,15 @@
 
 @push('styles')
   <style>
+    .termin-position-card {
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .termin-position-card:hover {
+      box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+      transform: translateY(-1px);
+    }
+
     .recent-transaction-card .card-header {
       border-bottom: 1px solid #eef2f6;
       padding-bottom: 18px;
@@ -157,10 +176,10 @@
             </div>
           </div>
           <span class="text-white d-block f-34 f-w-500 my-2">
-            Rp 25,4 jt
+            {{ $summary['income'] }}
             <i class="ti ti-arrow-up-right-circle opacity-50"></i>
           </span>
-          <p class="mb-0 opacity-75">Total Uang Masuk</p>
+          <p class="mb-0 opacity-75">Total Debet</p>
         </div>
       </div>
     </div>
@@ -183,10 +202,10 @@
             </div>
           </div>
           <span class="text-white d-block f-34 f-w-500 my-2">
-            Rp 14,8 jt
+            {{ $summary['expense'] }}
             <i class="ti ti-arrow-down-right-circle opacity-50"></i>
           </span>
-          <p class="mb-0 opacity-75">Total Uang Keluar</p>
+          <p class="mb-0 opacity-75">Total Kredit</p>
         </div>
       </div>
     </div>
@@ -205,11 +224,11 @@
             <div class="col-auto">
               <div class="balance-usd-chip">
                 <span>USD</span>
-                <strong>650</strong>
+                <strong>{{ $summary['balance_usd'] }}</strong>
               </div>
             </div>
           </div>
-          <span class="text-white d-block f-34 f-w-500 my-2">Rp 10,6 jt</span>
+          <span class="text-white d-block f-34 f-w-500 my-2">{{ $summary['balance'] }}</span>
           <p class="mb-0 opacity-75">Saldo Proyek IDR</p>
         </div>
       </div>
@@ -221,7 +240,7 @@
           <div class="row mb-3 align-items-center">
             <div class="col">
               <small class="text-muted">Arus Kas</small>
-              <h3>Uang Masuk vs Uang Keluar</h3>
+              <h3>Debet vs Kredit</h3>
             </div>
             <div class="col-auto">
               <select class="form-select p-r-35">
@@ -241,35 +260,50 @@
         <div class="card-body d-flex flex-column">
           <div class="row mb-3 align-items-center">
             <div class="col">
-              <small class="text-muted">Project Kemang</small>
+              <small class="text-muted">{{ $activeProject?->name ?? 'Belum ada project' }}</small>
               <h4 class="mb-0">Posisi Termin</h4>
             </div>
             <div class="col-auto">
-              <a href="{{ route('kelompok-pembayaran.index') }}" class="btn btn-sm btn-light-primary">Detail</a>
+              <a
+                href="{{ $paymentGroup && $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
+                class="btn btn-sm btn-light-primary"
+              >
+                Detail
+              </a>
             </div>
           </div>
 
-          <div class="rounded bg-light-warning p-3">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <div class="d-flex align-items-center">
-                <div class="avtar avtar-lg bg-warning text-white">
-                  <i class="ti ti-clock-dollar"></i>
+          @if ($paymentGroup)
+            <a
+              href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
+              class="rounded bg-light-warning p-3 d-block text-decoration-none termin-position-card"
+            >
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  <div class="avtar avtar-lg bg-warning text-white">
+                    <i class="ti ti-clock-dollar"></i>
+                  </div>
+                  <div class="ms-2">
+                    <h5 class="mb-0">Termin Berjalan</h5>
+                    <small class="text-muted">{{ $paymentGroup['code'] }}</small>
+                  </div>
                 </div>
-                <div class="ms-2">
-                  <h5 class="mb-0">Termin Berjalan</h5>
-                  <small class="text-muted">Kuitansi #001</small>
-                </div>
+                <span class="badge bg-warning">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
               </div>
-              <span class="badge bg-warning">2/3</span>
+              <div class="progress mb-2" style="height: 8px">
+                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+              <div class="d-flex justify-content-between">
+                <small class="text-muted">Sudah dibayar {{ $paymentGroup['paid_amount'] }}</small>
+                <small class="text-muted">Sisa {{ $paymentGroup['remaining_amount'] }}</small>
+              </div>
+            </a>
+          @else
+            <div class="rounded bg-light-secondary p-3">
+              <h5 class="mb-1">Belum ada termin</h5>
+              <small class="text-muted">Kelompok pembayaran untuk project ini belum dibuat.</small>
             </div>
-            <div class="progress mb-2" style="height: 8px">
-              <div class="progress-bar bg-warning" role="progressbar" style="width: 67%" aria-valuenow="67" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-            <div class="d-flex justify-content-between">
-              <small class="text-muted">Sudah dibayar Rp 2,0 jt</small>
-              <small class="text-muted">Sisa Rp 1,0 jt</small>
-            </div>
-          </div>
+          @endif
         </div>
       </div>
     </div>
@@ -279,7 +313,7 @@
         <div class="card-header">
           <div class="row align-items-center">
             <div class="col">
-              <small class="text-muted">Project Kemang</small>
+              <small class="text-muted">{{ $activeProject?->name ?? 'Belum ada project' }}</small>
               <h4 class="mb-0">Transaksi Terbaru</h4>
             </div>
             <div class="col-auto d-flex flex-wrap gap-2">
@@ -307,86 +341,59 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>
-                    <div class="transaction-date">
-                      <strong>27/08/2026</strong>
-                      <span>Kamis</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="transaction-name-cell">
-                      <div class="avtar avtar-s bg-light-primary">
-                        <i class="ti ti-receipt-2 text-primary"></i>
+                @forelse ($recentTransactions as $transaction)
+                  @php
+                    $isIncomeTransaction = $transaction['type'] === 'masuk';
+                  @endphp
+                  <tr>
+                    <td>
+                      <div class="transaction-date">
+                        <strong>{{ $transaction['date'] }}</strong>
+                        <span>{{ $transaction['day'] }}</span>
                       </div>
-                      <div>
-                        <strong>Beli material awal</strong>
-                        <span>Project Kemang - K9</span>
+                    </td>
+                    <td>
+                      <div class="transaction-name-cell">
+                        <div class="avtar avtar-s {{ $isIncomeTransaction ? 'bg-light-success' : 'bg-light-primary' }}">
+                          <i class="ti {{ $isIncomeTransaction ? 'ti-wallet' : 'ti-receipt-2' }} {{ $isIncomeTransaction ? 'text-success' : 'text-primary' }}"></i>
+                        </div>
+                        <div>
+                          <strong>{{ $transaction['name'] }}</strong>
+                          <span>{{ $transaction['area'] }}</span>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td><span class="badge bg-light-primary text-primary">Material</span></td>
-                  <td>Kuitansi #001 - 1/3</td>
-                  <td><span class="badge bg-light-danger text-danger">Keluar</span></td>
-                  <td class="text-end"><span class="transaction-amount text-danger">- Rp 1.000.000</span></td>
-                  <td>
-                    <button type="button" class="btn btn-sm btn-light-success receipt-action">
-                      <i class="ti ti-photo"></i> JPEG
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="transaction-date">
-                      <strong>27/08/2026</strong>
-                      <span>Kamis</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="transaction-name-cell">
-                      <div class="avtar avtar-s bg-light-success">
-                        <i class="ti ti-wallet text-success"></i>
-                      </div>
-                      <div>
-                        <strong>DP project</strong>
-                        <span>Project Kemang - K9</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td><span class="badge bg-light-success text-success">Dana Client</span></td>
-                  <td>-</td>
-                  <td><span class="badge bg-light-success text-success">Masuk</span></td>
-                  <td class="text-end"><span class="transaction-amount text-success">+ Rp 5.000.000</span></td>
-                  <td><span class="badge bg-light-secondary text-secondary">Belum Ada</span></td>
-                </tr>
-                <tr>
-                  <td>
-                    <div class="transaction-date">
-                      <strong>26/08/2026</strong>
-                      <span>Rabu</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="transaction-name-cell">
-                      <div class="avtar avtar-s bg-light-warning">
-                        <i class="ti ti-receipt text-warning"></i>
-                      </div>
-                      <div>
-                        <strong>Transport survey lokasi</strong>
-                        <span>Project Kemang - K8</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td><span class="badge bg-light-warning text-warning">Transportasi</span></td>
-                  <td>-</td>
-                  <td><span class="badge bg-light-danger text-danger">Keluar</span></td>
-                  <td class="text-end"><span class="transaction-amount text-danger">- Rp 250.000</span></td>
-                  <td>
-                    <button type="button" class="btn btn-sm btn-light-success receipt-action">
-                      <i class="ti ti-photo"></i> JPEG
-                    </button>
-                  </td>
-                </tr>
+                    </td>
+                    <td>
+                      <span class="badge {{ $isIncomeTransaction ? 'bg-light-success text-success' : 'bg-light-primary text-primary' }}">
+                        {{ $transaction['category'] }}
+                      </span>
+                    </td>
+                    <td>{{ $transaction['group'] }}</td>
+                    <td>
+                      <span class="badge {{ $isIncomeTransaction ? 'bg-light-success text-success' : 'bg-light-danger text-danger' }}">
+                        {{ $isIncomeTransaction ? 'Masuk' : 'Keluar' }}
+                      </span>
+                    </td>
+                    <td class="text-end">
+                      <span class="transaction-amount {{ $isIncomeTransaction ? 'text-success' : 'text-danger' }}">
+                        {{ $isIncomeTransaction ? '+' : '-' }} {{ $transaction['amount'] }}
+                      </span>
+                    </td>
+                    <td>
+                      @if ($transaction['has_receipt'])
+                        <span class="badge bg-light-success text-success">JPEG</span>
+                      @else
+                        <span class="badge bg-light-secondary text-secondary">Belum Ada</span>
+                      @endif
+                    </td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                      Belum ada transaksi untuk project aktif ini.
+                    </td>
+                  </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
@@ -395,32 +402,6 @@
     </div>
   </div>
 
-  <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="projectModalLabel">Tambah Proyek Baru</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="project-name" class="form-label">Nama Proyek</label>
-            <input type="text" class="form-control" id="project-name" placeholder="Contoh: Project BSD" />
-          </div>
-          <div class="mb-0">
-            <label for="project-team" class="form-label">Tim</label>
-            <input type="text" class="form-control" id="project-team" placeholder="Contoh: Tim Finance" />
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" id="save-project-button">
-            <i class="ti ti-plus me-1"></i> Tambah Proyek
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 @endsection
 
 @push('scripts')
@@ -428,76 +409,15 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const activeProjectInput = document.querySelector('#active-project');
-      const activeProjectName = document.querySelector('#active-project-name');
-      const projectMenu = document.querySelector('#project-menu');
-      const openProjectModalButton = document.querySelector('#open-project-modal');
-      const projectDivider = document.querySelector('#project-divider');
-      const projectModalElement = document.querySelector('#projectModal');
-      const projectModal = new bootstrap.Modal(projectModalElement);
-      const projectNameInput = document.querySelector('#project-name');
-      const saveProjectButton = document.querySelector('#save-project-button');
       const excelLink = document.querySelector('#export-excel-link');
       const pdfLink = document.querySelector('#export-pdf-link');
+      const chartSeries = @json($chartSeries);
 
       function updateExportLinks() {
         const selectedProject = activeProjectInput.value;
         excelLink.href = '{{ route('laporan.index') }}?export=excel&project=' + encodeURIComponent(selectedProject);
         pdfLink.href = '{{ route('laporan.index') }}?export=pdf&project=' + encodeURIComponent(selectedProject);
       }
-
-      function setActiveProject(value, name, selectedButton) {
-        activeProjectInput.value = value;
-        activeProjectName.textContent = name;
-
-        document.querySelectorAll('.project-option').forEach(function (button) {
-          button.classList.remove('active');
-        });
-
-        if (selectedButton) {
-          selectedButton.classList.add('active');
-        }
-
-        updateExportLinks();
-      }
-
-      function bindProjectOption(button) {
-        button.addEventListener('click', function () {
-          setActiveProject(button.dataset.projectValue, button.dataset.projectName, button);
-        });
-      }
-
-      document.querySelectorAll('.project-option').forEach(bindProjectOption);
-
-      openProjectModalButton.addEventListener('click', function () {
-        projectNameInput.value = '';
-        projectModal.show();
-      });
-
-      saveProjectButton.addEventListener('click', function () {
-        const projectName = projectNameInput.value.trim();
-
-        if (!projectName) {
-          projectNameInput.focus();
-          return;
-        }
-
-        const projectValue = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const projectItem = document.createElement('li');
-        const projectButton = document.createElement('button');
-
-        projectButton.className = 'dropdown-item project-option';
-        projectButton.type = 'button';
-        projectButton.dataset.projectValue = projectValue;
-        projectButton.dataset.projectName = projectName;
-        projectButton.innerHTML =
-          '<span class="project-option-check"><i class="ti ti-folder"></i></span><span class="project-option-copy"><span class="project-option-title"></span><span class="project-option-meta">Proyek baru</span></span>';
-        projectButton.querySelector('.project-option-title').textContent = projectName;
-        projectItem.appendChild(projectButton);
-        projectMenu.insertBefore(projectItem, projectDivider);
-        bindProjectOption(projectButton);
-        setActiveProject(projectValue, projectName, projectButton);
-        projectModal.hide();
-      });
 
       updateExportLinks();
 
@@ -514,9 +434,9 @@
         dataLabels: { enabled: false },
         colors: ['#2196f3', '#673ab7', '#ff9800'],
         series: [
-          { name: 'Uang Masuk', data: [7, 4, 6, 8, 5, 12, 9, 6, 10, 7, 11, 14] },
-          { name: 'Uang Keluar', data: [3, 5, 4, 6, 4, 7, 6, 3, 8, 5, 7, 9] },
-          { name: 'Saldo', data: [4, 3, 5, 7, 6, 8, 9, 7, 9, 10, 12, 13] }
+          { name: 'Debet', data: chartSeries.income },
+          { name: 'Kredit', data: chartSeries.expense },
+          { name: 'Saldo', data: chartSeries.balance }
         ],
         xaxis: {
           categories: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']

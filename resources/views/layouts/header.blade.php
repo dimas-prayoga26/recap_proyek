@@ -33,7 +33,7 @@
             </div>
             <div class="dropdown-header px-0 text-wrap header-notification-scroll position-relative" style="max-height: calc(100vh - 215px)">
               <div class="list-group list-group-flush w-100">
-                <a href="{{ route('kelompok-pembayaran.index') }}" class="list-group-item list-group-item-action">
+                <a href="{{ route('termin-pembayaran.index') }}" class="list-group-item list-group-item-action">
                   <div class="d-flex">
                     <div class="flex-shrink-0">
                       <div class="user-avtar bg-light-warning"><i class="ti ti-alert-circle"></i></div>

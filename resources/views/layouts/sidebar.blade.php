@@ -32,6 +32,12 @@
             <span class="pc-mtext">Project</span>
           </a>
         </li>
+        <li class="pc-item {{ request()->routeIs('kategori-pekerjaan.*') ? 'active' : '' }}">
+          <a href="{{ route('kategori-pekerjaan.index') }}" class="pc-link">
+            <span class="pc-micon"><i class="ti ti-businessplan"></i></span>
+            <span class="pc-mtext">Kategori Pekerjaan</span>
+          </a>
+        </li>
         <li class="pc-item {{ request()->routeIs('kategori.*') ? 'active' : '' }}">
           <a href="{{ route('kategori.index') }}" class="pc-link">
             <span class="pc-micon"><i class="ti ti-tag"></i></span>
@@ -55,10 +61,10 @@
             <span class="pc-mtext">Uang Keluar</span>
           </a>
         </li>
-        <li class="pc-item {{ request()->routeIs('kelompok-pembayaran.*') ? 'active' : '' }}">
-          <a href="{{ route('kelompok-pembayaran.index') }}" class="pc-link">
+        <li class="pc-item {{ request()->routeIs('termin-pembayaran.*') ? 'active' : '' }}">
+          <a href="{{ route('termin-pembayaran.index') }}" class="pc-link">
             <span class="pc-micon"><i class="ti ti-list-check"></i></span>
-            <span class="pc-mtext">Kelompok Pembayaran</span>
+            <span class="pc-mtext">Termin Pembayaran</span>
           </a>
         </li>
 

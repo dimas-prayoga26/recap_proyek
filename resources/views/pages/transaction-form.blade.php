@@ -1,6 +1,22 @@
 @php
   $isIncome = ($mode ?? 'masuk') === 'masuk';
   $transactionType = $isIncome ? 'masuk' : 'keluar';
+  $selectedCategory = old('transaction_category_id')
+    ? ($categories ?? collect())->firstWhere('id', (int) old('transaction_category_id'))
+    : ($categories ?? collect())->first();
+  $selectedWorkItem = old('work_item_id')
+    ? ($workItems ?? collect())->firstWhere('id', (int) old('work_item_id'))
+    : (request()->query('work_item_id')
+      ? ($workItems ?? collect())->firstWhere('id', (int) request()->query('work_item_id'))
+      : ($workItems ?? collect())->first());
+  $selectedProjectArea = old('project_area_id')
+    ? ($projectAreas ?? collect())->firstWhere('id', (int) old('project_area_id'))
+    : ($selectedWorkItem?->project_area_id
+      ? ($projectAreas ?? collect())->firstWhere('id', $selectedWorkItem->project_area_id)
+      : ($projectAreas ?? collect())->first());
+  $selectedVendor = old('vendor_id')
+    ? ($vendors ?? collect())->firstWhere('id', (int) old('vendor_id'))
+    : $selectedWorkItem?->vendor;
 @endphp
 
 @extends('layouts.app')
@@ -69,6 +85,163 @@
       border: 1px solid #fde68a;
       border-radius: 8px;
       padding: 18px;
+    }
+
+    .work-termin-info {
+      background: #f8fbff;
+      border: 1px solid #d7e9fb;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      padding: 16px;
+    }
+
+    .work-termin-metrics {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 14px;
+    }
+
+    .work-termin-metric {
+      background: #fff;
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .work-termin-metric span {
+      color: #697586;
+      display: block;
+      font-size: 12px;
+    }
+
+    .work-termin-metric strong {
+      color: #202939;
+      display: block;
+      font-size: 18px;
+      line-height: 1.25;
+      margin-top: 4px;
+    }
+
+    .work-termin-history {
+      flex: 0 0 auto;
+      width: auto;
+    }
+
+    .work-termin-package {
+      border-top: 1px solid #e3e8ef;
+      margin-top: 14px;
+      padding-top: 14px;
+    }
+
+    .allocation-row {
+      background: #f8fafc;
+      border: 1px solid #e3e8ef;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      padding: 14px 14px 4px;
+    }
+
+    .allocation-history {
+      background: #f8fafc;
+      border: 1px dashed #cdd5df;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      padding: 12px 14px;
+    }
+
+    .allocation-history-list {
+      margin: 0;
+      padding: 0;
+    }
+
+    .allocation-history-list li {
+      align-items: center;
+      color: #697586;
+      display: flex;
+      font-size: 13px;
+      justify-content: space-between;
+      list-style: none;
+      padding: 4px 0;
+    }
+
+    .allocation-history-list li strong {
+      color: #364152;
+      font-weight: 600;
+    }
+
+    .work-termin-package-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .work-termin-package-list li {
+      background: #e3f2fd;
+      border-radius: 6px;
+      color: #202939;
+      display: inline-flex;
+      font-size: 12px;
+      list-style: none;
+      padding: 6px 9px;
+    }
+
+    .searchable-select {
+      position: relative;
+    }
+
+    .searchable-select-menu {
+      background: #fff;
+      border: 1px solid #e3e8ef;
+      border-radius: 8px;
+      box-shadow: 0 12px 24px rgba(16, 24, 40, 0.12);
+      display: none;
+      margin-top: 4px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 6px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      z-index: 20;
+    }
+
+    .searchable-select-menu.is-open {
+      display: block;
+    }
+
+    .searchable-select-item {
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      color: #202939;
+      display: block;
+      font-size: 14px;
+      padding: 8px 10px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .searchable-select-item small {
+      color: #697586;
+      display: block;
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .searchable-select-item:hover,
+    .searchable-select-item.is-active {
+      background: #eef6ff;
+      color: #2196f3;
+    }
+
+    .searchable-select-empty {
+      color: #697586;
+      font-size: 13px;
+      padding: 8px 10px;
     }
 
     .receipt-upload {
@@ -154,6 +327,10 @@
         min-width: 0;
         width: 100%;
       }
+
+      .work-termin-metrics {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 @endpush
@@ -169,13 +346,23 @@
             </div>
             <div>
               <h4 class="mb-1">Form Transaksi</h4>
-              <p class="text-muted mb-0">Project Kemang</p>
+              <p class="text-muted mb-0">{{ $activeProject?->name ?? 'Belum ada project aktif' }}</p>
             </div>
           </div>
 
-          <form id="transaction-form">
+          @if (session('status'))
+            <div class="alert alert-success">{{ session('status') }}</div>
+          @endif
+
+          @if ($errors->any())
+            <div class="alert alert-danger">
+              Data belum lengkap. Cek lagi field yang wajib diisi.
+            </div>
+          @endif
+
+          <form id="transaction-form" method="POST" action="{{ route('transactions.store') }}" enctype="multipart/form-data">
             @csrf
-            <input type="hidden" name="jenis_transaksi" id="transaction-type" value="{{ $transactionType }}" />
+            <input type="hidden" name="type" id="transaction-type" value="{{ $transactionType }}" />
             <input type="hidden" name="kelompok_pembayaran" value="termin" />
 
             <div class="mb-4">
@@ -194,33 +381,36 @@
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="main-category" class="form-label">Project / Kategori Utama</label>
-                  <select class="form-select" id="main-category" name="kategori_utama" required>
-                    <option value="Project Kemang - K9" selected>Project Kemang - K9</option>
-                    <option value="Project Kemang - K8">Project Kemang - K8</option>
-                    <option value="Project Kemang - C21">Project Kemang - C21</option>
-                    <option value="Project Baru">Project Baru</option>
+                  <select class="form-select @error('project_area_id') is-invalid @enderror" id="main-category" name="project_area_id" required>
+                    @forelse (($projectAreas ?? collect()) as $area)
+                      <option value="{{ $area->id }}" @selected((int) old('project_area_id', $selectedProjectArea?->id) === $area->id)>
+                        {{ $area->name }}
+                      </option>
+                    @empty
+                      <option value="">Project belum tersedia</option>
+                    @endforelse
                   </select>
+                  @error('project_area_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                   <span class="form-helper">Dipakai untuk memisahkan laporan per project atau area kerja.</span>
                 </div>
               </div>
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="category" class="form-label">Kategori</label>
-                  <select class="form-select" id="category" name="kategori" required>
-                    @if ($isIncome)
-                      <option selected>Dana Client</option>
-                      <option>DP Project</option>
-                      <option>Pelunasan</option>
-                      <option>Reimbursement</option>
-                      <option>Modal Tambahan</option>
-                    @else
-                      <option selected>Material</option>
-                      <option>Jasa Tukang</option>
-                      <option>Transportasi</option>
-                      <option>Konsumsi</option>
-                      <option>Operasional</option>
-                    @endif
+                  <select class="form-select @error('transaction_category_id') is-invalid @enderror" id="category" name="transaction_category_id" required>
+                    @forelse (($categories ?? collect()) as $category)
+                      <option value="{{ $category->id }}" @selected((int) old('transaction_category_id', $selectedCategory?->id) === $category->id)>
+                        {{ $category->name }}
+                      </option>
+                    @empty
+                      <option value="">Kategori belum tersedia</option>
+                    @endforelse
                   </select>
+                  @error('transaction_category_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
             </div>
@@ -229,16 +419,83 @@
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="activity-name" class="form-label">Nama Barang / Nama Kegiatan</label>
-                  <input type="text" class="form-control" id="activity-name" name="nama" placeholder="{{ $isIncome ? 'Contoh: DP pekerjaan interior' : 'Contoh: Pembelian marmer ruang tamu' }}" required />
+                  <div class="searchable-select js-searchable-select" data-filter-select="#main-category" data-filter-attr="areaId">
+                    <input type="text" class="form-control searchable-select-input @error('work_item_id') is-invalid @enderror" data-role="search-input" placeholder="Cari nama barang / kegiatan..." autocomplete="off" />
+                    <div class="searchable-select-menu" data-role="menu"></div>
+                    <select class="form-select d-none" id="activity-name" name="work_item_id" data-role="source">
+                      @forelse (($workItems ?? collect()) as $item)
+                        <option
+                          value="{{ $item->id }}"
+                          data-vendor-id="{{ $item->vendor_id }}"
+                          data-area-id="{{ $item->project_area_id }}"
+                          data-package-name="{{ $item->package_name }}"
+                          data-package-label="{{ trim(($item->package_name ? 'Kategori: '.$item->package_name.' | ' : '').$item->packageItems->pluck('name')->join(', ')) }}"
+                          data-search="{{ $item->name.' '.$item->package_name.' '.$item->brand.' '.$item->packageItems->pluck('name')->join(' ') }}"
+                          @selected((int) old('work_item_id', $selectedWorkItem?->id) === $item->id)
+                        >
+                          {{ $item->package_name ? $item->package_name.' - '.$item->name : $item->name }}
+                        </option>
+                      @empty
+                        <option value="">Nama barang/kegiatan belum tersedia</option>
+                      @endforelse
+                    </select>
+                  </div>
+                  @error('work_item_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="vendor-name" class="form-label">Nama Vendor</label>
-                  <input type="text" class="form-control" id="vendor-name" name="nama_vendor" placeholder="{{ $isIncome ? 'Contoh: Client / owner project' : 'Contoh: Toko material / vendor jasa' }}" />
+                  <div class="searchable-select js-searchable-select">
+                    <input type="text" class="form-control searchable-select-input @error('vendor_id') is-invalid @enderror" data-role="search-input" placeholder="Cari nama vendor..." autocomplete="off" />
+                    <div class="searchable-select-menu" data-role="menu"></div>
+                    <select class="form-select d-none" id="vendor-name" name="vendor_id" data-role="source">
+                      <option value="">-</option>
+                      @foreach (($vendors ?? collect()) as $vendor)
+                        <option value="{{ $vendor->id }}" @selected((int) old('vendor_id', $selectedVendor?->id) === $vendor->id)>
+                          {{ $vendor->name }}
+                        </option>
+                      @endforeach
+                    </select>
+                  </div>
+                  @error('vendor_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
             </div>
+
+            @unless ($isIncome)
+              <div class="work-termin-info" id="work-termin-info">
+                <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                  <div>
+                    <small class="text-muted">Info Termin</small>
+                    <h5 class="mb-0" id="termin-info-title">-</h5>
+                  </div>
+                  <select class="form-select form-select-sm work-termin-history" id="termin-info-history"></select>
+                </div>
+                <div class="work-termin-metrics">
+                  <div class="work-termin-metric">
+                    <span>Total Penawaran</span>
+                    <strong id="termin-info-offer">Rp 0</strong>
+                  </div>
+                  <div class="work-termin-metric">
+                    <span>Total Sudah Dibayar</span>
+                    <strong class="text-success" id="termin-info-paid">Rp 0</strong>
+                  </div>
+                  <div class="work-termin-metric">
+                    <span>Sisa</span>
+                    <strong class="text-primary" id="termin-info-remaining">Rp 0</strong>
+                  </div>
+                </div>
+                <div class="work-termin-package d-none" id="termin-info-package">
+                  <small class="text-muted d-block mb-1">Paket ini mencakup:</small>
+                  <ul class="work-termin-package-list" id="termin-info-package-list"></ul>
+                </div>
+              </div>
+            @endunless
 
             <div class="row">
               <div class="col-md-6">
@@ -246,31 +503,40 @@
                   <label for="amount" class="form-label">Nominal</label>
                   <div class="input-group">
                     <span class="input-group-text">Rp</span>
-                    <input type="number" class="form-control" id="amount" name="nominal" min="0" step="1000" placeholder="0" required />
+                    <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount" name="amount" min="0" step="1" placeholder="0" value="{{ old('amount') }}" required />
+                    @error('amount')
+                      <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                   </div>
                 </div>
               </div>
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="record-date" class="form-label">Tanggal Pencatatan</label>
-                  <input type="date" class="form-control" id="record-date" name="tanggal" value="{{ now()->toDateString() }}" required />
+                  <input type="date" class="form-control @error('recorded_at') is-invalid @enderror" id="record-date" name="recorded_at" value="{{ old('recorded_at', now()->toDateString()) }}" required />
+                  @error('recorded_at')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
             </div>
 
             <div class="mb-4">
               <label for="notes" class="form-label">Catatan</label>
-              <textarea class="form-control" id="notes" name="catatan" rows="3" placeholder="Tambahan detail transaksi bila diperlukan"></textarea>
+              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Tambahan detail transaksi bila diperlukan">{{ old('notes') }}</textarea>
             </div>
 
             <div class="mb-4">
-              <label class="form-label d-block">Kelompok Pembayaran</label>
+              <label class="form-label d-block">Termin Pembayaran</label>
+              @unless ($isIncome)
+                <span class="form-helper mb-2">Jika disimpan dari Uang Keluar, nominal ini otomatis masuk ke rekap Termin Pembayaran.</span>
+              @endunless
               <div class="termin-panel" id="termin-panel">
                 <div class="row">
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label for="receipt-code" class="form-label">Nomor / Nama Kuitansi</label>
-                      <input type="text" class="form-control" id="receipt-code" name="kode_kuitansi" placeholder="Contoh: Kuitansi #001" />
+                      <input type="text" class="form-control" id="receipt-code" name="payment_group_code" value="{{ old('payment_group_code') }}" placeholder="Contoh: Kuitansi #001" />
                     </div>
                   </div>
                   <div class="col-md-6">
@@ -278,25 +544,57 @@
                       <label for="receipt-total" class="form-label">Total Nilai Kuitansi</label>
                       <div class="input-group">
                         <span class="input-group-text">Rp</span>
-                        <input type="number" class="form-control" id="receipt-total" name="total_kuitansi" min="0" step="1000" placeholder="0" />
+                        <input type="number" class="form-control" id="receipt-total" name="receipt_total" min="0" step="1" value="{{ old('receipt_total') }}" placeholder="0" />
                       </div>
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="mb-0">
                       <label for="payment-number" class="form-label">Pembayaran ke</label>
-                      <input type="number" class="form-control" id="payment-number" name="pembayaran_ke" min="1" value="1" />
+                      <select class="form-select" id="payment-number" name="payment_number">
+                        @for ($i = 1; $i <= 24; $i++)
+                          <option value="{{ $i }}" @selected((int) old('payment_number', 1) === $i)>Pembayaran ke-{{ $i }}</option>
+                        @endfor
+                      </select>
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="mb-0">
-                      <label for="payment-total" class="form-label">Total Termin</label>
-                      <input type="number" class="form-control" id="payment-total" name="total_termin" min="1" value="3" />
+                      <label for="payment-total" class="form-label">Total Termin Rencana</label>
+                      <input type="number" class="form-control" id="payment-total" name="payment_total" min="1" value="{{ old('payment_total', $selectedWorkItem?->fixed_total_terms ?? 8) }}" readonly />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            @unless ($isIncome)
+              <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <label class="form-label d-block mb-0">Alokasi Tambahan (opsional)</label>
+                  <small class="text-muted" id="allocation-summary">Total alokasi: Rp 0</small>
+                </div>
+                <span class="form-helper mb-2">
+                  Kalau nominal transaksi ini sebenarnya melunasi lebih dari satu pekerjaan sekaligus (misal ada tambahan/paket lain yang dibayar bareng), pecah sisanya ke pekerjaan lain di sini.
+                </span>
+
+                <div class="allocation-history d-none" id="allocation-history">
+                  <small class="text-muted d-block mb-2">
+                    <i class="ti ti-history me-1"></i>
+                    Riwayat alokasi pekerjaan ini (sudah tercatat, tidak ikut tersimpan lagi):
+                  </small>
+                  <ul class="allocation-history-list" id="allocation-history-list"></ul>
+                </div>
+
+                <div id="allocation-rows"></div>
+                <button type="button" class="btn btn-sm btn-light-secondary" id="allocation-add-row">
+                  <i class="ti ti-plus me-1"></i> Tambah Alokasi
+                </button>
+                @error('allocations')
+                  <div class="text-danger small mt-2">{{ $message }}</div>
+                @enderror
+              </div>
+            @endunless
 
             <div class="mb-4">
               <label class="form-label d-block">Bukti Transaksi</label>
@@ -305,7 +603,7 @@
                   <i class="ti ti-photo-plus text-primary"></i>
                 </span>
                 <strong class="d-block">Upload / Capture JPEG</strong>
-                <input type="file" id="receipt-file" name="bukti" accept="image/jpeg,image/jpg" capture="environment" />
+                <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg" capture="environment" />
               </label>
               <div class="receipt-preview" id="receipt-preview">
                 <img alt="Preview bukti transaksi" id="receipt-image" />
@@ -320,7 +618,7 @@
 
             <div class="d-flex flex-wrap gap-2">
               <button type="submit" class="btn btn-primary">
-                <i class="ti ti-device-floppy me-1"></i> Simpan Draft
+                <i class="ti ti-device-floppy me-1"></i> Simpan Transaksi
               </button>
               <button type="reset" class="btn btn-light-secondary">
                 <i class="ti ti-refresh me-1"></i> Reset
@@ -346,19 +644,19 @@
 
           <div class="summary-line">
             <span>Project</span>
-            <strong id="summary-project">Project Kemang - K9</strong>
+            <strong id="summary-project">{{ $selectedProjectArea?->name ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
             <span>Nama</span>
-            <strong id="summary-name">Belum diisi</strong>
+            <strong id="summary-name">{{ $selectedWorkItem?->name ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
             <span>Vendor</span>
-            <strong id="summary-vendor">-</strong>
+            <strong id="summary-vendor">{{ $selectedVendor?->name ?? '-' }}</strong>
           </div>
           <div class="summary-line">
             <span>Kategori</span>
-            <strong id="summary-category">{{ $isIncome ? 'Dana Client' : 'Material' }}</strong>
+            <strong id="summary-category">{{ $selectedCategory?->name ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
             <span>Nominal</span>
@@ -393,6 +691,7 @@
       const vendorInput = document.querySelector('#vendor-name');
       const amountInput = document.querySelector('#amount');
       const receiptCodeInput = document.querySelector('#receipt-code');
+      const receiptTotalInput = document.querySelector('#receipt-total');
       const paymentNumberInput = document.querySelector('#payment-number');
       const paymentTotalInput = document.querySelector('#payment-total');
       const receiptFileInput = document.querySelector('#receipt-file');
@@ -402,11 +701,355 @@
       const receiptSize = document.querySelector('#receipt-size');
       const draftStatus = document.querySelector('#draft-status');
 
+      function enhanceSearchableSelect(wrapper) {
+        const select = wrapper.querySelector('[data-role="source"]');
+        const input = wrapper.querySelector('[data-role="search-input"]');
+        const menu = wrapper.querySelector('[data-role="menu"]');
+        const filterAttr = wrapper.dataset.filterAttr;
+        const filterSelect = wrapper.dataset.filterSelect ? document.querySelector(wrapper.dataset.filterSelect) : null;
+
+        function options() {
+          const list = Array.from(select.options).filter(function (option) {
+            return option.value !== '';
+          });
+
+          if (!filterSelect || !filterSelect.value) {
+            return list;
+          }
+
+          return list.filter(function (option) {
+            return !option.dataset[filterAttr] || option.dataset[filterAttr] === filterSelect.value;
+          });
+        }
+
+        function selectedLabel() {
+          const option = select.options[select.selectedIndex];
+          return option && option.value !== '' ? option.textContent.trim() : '';
+        }
+
+        function syncInputFromSelect() {
+          input.value = selectedLabel();
+          input.classList.remove('is-invalid');
+        }
+
+        function closeMenu() {
+          menu.classList.remove('is-open');
+        }
+
+        function renderMenu(term) {
+          const query = (term || '').toLowerCase();
+          const matches = options().filter(function (option) {
+            return (option.dataset.search || option.textContent).toLowerCase().includes(query);
+          });
+
+          menu.innerHTML = '';
+
+          if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-select-empty';
+            empty.textContent = 'Tidak ditemukan';
+            menu.appendChild(empty);
+            return;
+          }
+
+          matches.forEach(function (option) {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'searchable-select-item' + (option.value === select.value ? ' is-active' : '');
+
+            const label = document.createElement('span');
+            label.textContent = option.textContent.trim();
+            item.appendChild(label);
+
+            if (option.dataset.packageLabel) {
+              const helper = document.createElement('small');
+              helper.textContent = option.dataset.packageLabel;
+              item.appendChild(helper);
+            }
+
+            item.addEventListener('mousedown', function (event) {
+              event.preventDefault();
+              select.value = option.value;
+              syncInputFromSelect();
+              closeMenu();
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            menu.appendChild(item);
+          });
+        }
+
+        function openMenu() {
+          renderMenu('');
+          menu.classList.add('is-open');
+        }
+
+        input.addEventListener('focus', function () {
+          input.value = '';
+          openMenu();
+        });
+
+        input.addEventListener('input', function () {
+          renderMenu(input.value);
+          menu.classList.add('is-open');
+        });
+
+        input.addEventListener('blur', function () {
+          setTimeout(function () {
+            syncInputFromSelect();
+            closeMenu();
+          }, 120);
+        });
+
+        function refreshForFilter() {
+          const allowedValues = options().map(function (option) {
+            return option.value;
+          });
+
+          if (select.value && allowedValues.indexOf(select.value) === -1) {
+            select.value = allowedValues[0] || '';
+            syncInputFromSelect();
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+
+        select.addEventListener('change', syncInputFromSelect);
+
+        if (filterSelect) {
+          filterSelect.addEventListener('change', refreshForFilter);
+        }
+
+        syncInputFromSelect();
+
+        return { wrapper: wrapper, sync: syncInputFromSelect, refreshForFilter: refreshForFilter };
+      }
+
+      const searchableSelects = Array.from(document.querySelectorAll('.js-searchable-select')).map(enhanceSearchableSelect);
+      const searchableSelectSyncs = searchableSelects.map(function (entry) {
+        return entry.sync;
+      });
+
+      const allocationRows = document.querySelector('#allocation-rows');
+      const allocationAddRow = document.querySelector('#allocation-add-row');
+      const allocationSummary = document.querySelector('#allocation-summary');
+      const allocationHistory = document.querySelector('#allocation-history');
+      const allocationHistoryList = document.querySelector('#allocation-history-list');
+
+      function renderAllocationHistory(info) {
+        if (!allocationHistory) {
+          return;
+        }
+
+        const shared = (info && info.shared_allocations) || [];
+
+        allocationHistoryList.innerHTML = '';
+
+        if (shared.length === 0) {
+          allocationHistory.classList.add('d-none');
+          return;
+        }
+
+        shared.forEach(function (allocation) {
+          const item = document.createElement('li');
+          item.innerHTML = '<span>' + allocation.name + '</span><strong>' + formatCurrency(allocation.amount) + '</strong>';
+          allocationHistoryList.appendChild(item);
+        });
+
+        allocationHistory.classList.remove('d-none');
+      }
+      let allocationRowIndex = 0;
+
+      function updateAllocationSummary() {
+        if (!allocationSummary) {
+          return;
+        }
+
+        const total = Array.from(document.querySelectorAll('.allocation-amount')).reduce(function (sum, input) {
+          return sum + (Number(input.value) || 0);
+        }, 0);
+
+        allocationSummary.textContent = 'Total alokasi: ' + formatCurrency(total);
+        allocationSummary.classList.toggle('text-danger', total > Number(amountInput.value || 0));
+      }
+
+      function createAllocationRow() {
+        const index = allocationRowIndex++;
+        const row = document.createElement('div');
+        row.className = 'allocation-row row g-2 align-items-end';
+        row.innerHTML =
+          '<div class="col-md-5">'
+          + '<label class="form-label">Pekerjaan</label>'
+          + '<div class="searchable-select js-searchable-select" data-filter-select="#main-category" data-filter-attr="areaId">'
+          + '<input type="text" class="form-control searchable-select-input" data-role="search-input" placeholder="Cari pekerjaan..." autocomplete="off" />'
+          + '<div class="searchable-select-menu" data-role="menu"></div>'
+          + '<select class="form-select d-none" name="allocations[' + index + '][work_item_id]" data-role="source"></select>'
+          + '</div>'
+          + '</div>'
+          + '<div class="col-md-3">'
+          + '<label class="form-label">Nominal</label>'
+          + '<div class="input-group">'
+          + '<span class="input-group-text">Rp</span>'
+          + '<input type="number" class="form-control allocation-amount" name="allocations[' + index + '][amount]" min="0" step="1" placeholder="0" />'
+          + '</div>'
+          + '</div>'
+          + '<div class="col-md-2">'
+          + '<label class="form-label">Pembayaran ke</label>'
+          + '<input type="number" class="form-control" name="allocations[' + index + '][payment_number]" min="1" placeholder="Otomatis" />'
+          + '</div>'
+          + '<div class="col-md-2">'
+          + '<button type="button" class="btn btn-light-secondary w-100 allocation-remove"><i class="ti ti-trash"></i></button>'
+          + '</div>'
+          + '<div class="col-12 mb-3">'
+          + '<input type="text" class="form-control form-control-sm mt-1" name="allocations[' + index + '][notes]" placeholder="Catatan alokasi (opsional)" />'
+          + '</div>';
+
+        const select = row.querySelector('[data-role="source"]');
+        select.innerHTML = activityInput.innerHTML;
+        Array.from(select.options).forEach(function (option) {
+          option.selected = false;
+          option.removeAttribute('selected');
+        });
+        select.insertAdjacentHTML('afterbegin', '<option value="">-</option>');
+        select.value = '';
+
+        allocationRows.appendChild(row);
+        enhanceSearchableSelect(row.querySelector('.js-searchable-select'));
+
+        row.querySelector('.allocation-remove').addEventListener('click', function () {
+          row.remove();
+          updateAllocationSummary();
+        });
+
+        row.querySelector('.allocation-amount').addEventListener('input', updateAllocationSummary);
+      }
+
+      if (allocationAddRow) {
+        allocationAddRow.addEventListener('click', createAllocationRow);
+        amountInput.addEventListener('input', updateAllocationSummary);
+      }
+
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       const rupiahFormatter = new Intl.NumberFormat('id-ID');
+      const terminInfo = @json($workItemTerminInfo ?? []);
+      const terminTitle = document.querySelector('#termin-info-title');
+      const terminHistory = document.querySelector('#termin-info-history');
+      const terminPackage = document.querySelector('#termin-info-package');
+      const terminPackageList = document.querySelector('#termin-info-package-list');
+      const terminOffer = document.querySelector('#termin-info-offer');
+      const terminPaid = document.querySelector('#termin-info-paid');
+      const terminRemaining = document.querySelector('#termin-info-remaining');
 
       function formatCurrency(value) {
         return 'Rp ' + rupiahFormatter.format(Number(value || 0));
+      }
+
+      function currentTerminInfo() {
+        return terminInfo[activityInput.value] || {
+          offer: 0,
+          paid: 0,
+          remaining: 0,
+          next_payment_number: 1,
+          total_terms: 8,
+          terms: [],
+        };
+      }
+
+      function refreshPaymentNumberOptions(info, forceDefault) {
+        const paidByNumber = {};
+
+        (info.terms || []).forEach(function (term) {
+          paidByNumber[term.number] = term.amount;
+        });
+
+        const nextPaymentNumber = Number(info.next_payment_number || 1);
+        const totalTerms = Math.max(1, parseInt(paymentTotalInput.value, 10) || Number(info.total_terms || 1) || nextPaymentNumber);
+        const currentValue = Number(paymentNumberInput.value);
+        const desiredValue = !forceDefault && currentValue && currentValue <= totalTerms
+          ? currentValue
+          : Math.min(nextPaymentNumber, totalTerms);
+
+        paymentNumberInput.innerHTML = '';
+
+        for (let number = 1; number <= totalTerms; number++) {
+          const option = document.createElement('option');
+          option.value = number;
+          option.textContent = 'Pembayaran ke-'
+            + number
+            + ' - '
+            + (paidByNumber[number] !== undefined ? formatCurrency(paidByNumber[number]) : 'Belum dibayar');
+          paymentNumberInput.appendChild(option);
+        }
+
+        paymentNumberInput.value = desiredValue;
+      }
+
+      function parsePackageAreas(notes) {
+        const match = /^Paket gabungan \d+ area \(harga satu paket, bukan per-area\):\s*(.+?)\.\s*(?:Kontraktor:.*?\.\s*)?Total penawaran/.exec(notes || '');
+
+        if (!match) {
+          return null;
+        }
+
+        return match[1].split(', ').map(function (segment) {
+          return segment.trim();
+        }).filter(function (segment) {
+          return segment !== '';
+        });
+      }
+
+      function updateTerminInfo() {
+        const info = currentTerminInfo();
+        const nextPaymentNumber = Number(info.next_payment_number || 1);
+
+        if (terminTitle) {
+          const terms = info.terms || [];
+
+          terminTitle.textContent = selectedText(activityInput) || '-';
+          terminOffer.textContent = formatCurrency(info.offer);
+          terminPaid.textContent = formatCurrency(info.paid);
+          terminRemaining.textContent = formatCurrency(info.remaining);
+          terminRemaining.classList.toggle('text-danger', Number(info.remaining) < 0);
+          terminRemaining.classList.toggle('text-primary', Number(info.remaining) >= 0);
+
+          terminHistory.innerHTML = '';
+          terms.forEach(function (term) {
+            const option = document.createElement('option');
+            option.value = term.number;
+            option.textContent = 'Pembayaran ke-' + term.number + ' · ' + formatCurrency(term.amount);
+            terminHistory.appendChild(option);
+          });
+
+          const upcomingOption = document.createElement('option');
+          upcomingOption.value = nextPaymentNumber;
+          upcomingOption.textContent = 'Pembayaran ke-' + nextPaymentNumber + ' · Belum dibayar';
+          terminHistory.appendChild(upcomingOption);
+          terminHistory.value = nextPaymentNumber;
+
+          receiptTotalInput.value = info.offer || '';
+          paymentTotalInput.value = Number(info.total_terms || 1);
+
+          const packageAreas = (info.package_items || []).length > 0
+            ? info.package_items.map(function (item) {
+                return item.brand ? item.name + ' - ' + item.brand : item.name;
+              })
+            : parsePackageAreas(info.notes);
+
+          if (packageAreas) {
+            terminPackageList.innerHTML = '';
+            packageAreas.forEach(function (area) {
+              const item = document.createElement('li');
+              item.textContent = area;
+              terminPackageList.appendChild(item);
+            });
+            terminPackage.classList.remove('d-none');
+          } else {
+            terminPackage.classList.add('d-none');
+          }
+        }
+
+        renderAllocationHistory(info);
+        refreshPaymentNumberOptions(info, true);
+        updateSummary();
       }
 
       function selectedDayName() {
@@ -418,17 +1061,37 @@
         return dayNames[selectedDate.getDay()];
       }
 
+      function selectedText(input) {
+        if (!input || !input.selectedOptions || input.selectedOptions.length === 0) {
+          return '';
+        }
+
+        return input.selectedOptions[0].textContent.trim();
+      }
+
       function updateSummary() {
         const receiptLabel = receiptCodeInput.value.trim() || 'Kuitansi';
         const paymentLabel = receiptLabel + ' - ' + (paymentNumberInput.value || 1) + '/' + (paymentTotalInput.value || 1);
 
-        document.querySelector('#summary-project').textContent = projectInput.value;
-        document.querySelector('#summary-name').textContent = activityInput.value.trim() || 'Belum diisi';
-        document.querySelector('#summary-vendor').textContent = vendorInput.value.trim() || '-';
-        document.querySelector('#summary-category').textContent = categoryInput.value;
+        document.querySelector('#summary-project').textContent = selectedText(projectInput) || 'Belum tersedia';
+        document.querySelector('#summary-name').textContent = selectedText(activityInput) || 'Belum tersedia';
+        document.querySelector('#summary-vendor').textContent = selectedText(vendorInput) || '-';
+        document.querySelector('#summary-category').textContent = selectedText(categoryInput) || 'Belum tersedia';
         document.querySelector('#summary-amount').textContent = formatCurrency(amountInput.value);
         document.querySelector('#summary-date').textContent = dateInput.value ? selectedDayName() + ', ' + dateInput.value : '-';
         document.querySelector('#summary-payment').textContent = paymentLabel;
+      }
+
+      function syncVendorFromWorkItem() {
+        const selectedOption = activityInput.selectedOptions[0];
+        const vendorId = selectedOption ? selectedOption.dataset.vendorId : '';
+
+        if (vendorId) {
+          vendorInput.value = vendorId;
+          vendorInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        updateTerminInfo();
       }
 
       function sizeLabel(bytes) {
@@ -505,29 +1168,66 @@
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedBlob.size);
       }
 
-      [dateInput, projectInput, categoryInput, activityInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
+      [dateInput, projectInput, categoryInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
         input.addEventListener('input', function () {
+          updateSummary();
+        });
+
+        input.addEventListener('change', function () {
           updateSummary();
         });
       });
 
+      activityInput.addEventListener('change', syncVendorFromWorkItem);
       receiptFileInput.addEventListener('change', handleReceiptFile);
+
+      paymentTotalInput.addEventListener('input', function () {
+        refreshPaymentNumberOptions(currentTerminInfo());
+      });
+
+      searchableSelects.forEach(function (entry) {
+        if (entry.wrapper.dataset.filterSelect) {
+          entry.refreshForFilter();
+        }
+      });
+
+      form.addEventListener('submit', function (event) {
+        if (!activityInput.value) {
+          event.preventDefault();
+          const searchInput = activityInput.closest('.searchable-select').querySelector('[data-role="search-input"]');
+          searchInput.classList.add('is-invalid');
+          searchInput.focus();
+          return;
+        }
+
+        const totalAllocations = Array.from(document.querySelectorAll('.allocation-amount')).reduce(function (sum, input) {
+          return sum + (Number(input.value) || 0);
+        }, 0);
+
+        if (totalAllocations > Number(amountInput.value || 0)) {
+          event.preventDefault();
+          updateAllocationSummary();
+          allocationSummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
 
       form.addEventListener('reset', function () {
         setTimeout(function () {
           receiptPreview.classList.remove('is-visible');
           draftStatus.classList.add('d-none');
-          updateSummary();
+          updateTerminInfo();
+          searchableSelectSyncs.forEach(function (sync) {
+            sync();
+          });
+
+          if (allocationRows) {
+            allocationRows.innerHTML = '';
+            updateAllocationSummary();
+          }
         });
       });
 
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        draftStatus.textContent = 'Draft form sudah siap. Tahap berikutnya baru kita sambungkan ke tabel database dan penyimpanan bukti.';
-        draftStatus.classList.remove('d-none');
-      });
-
-      updateSummary();
+      updateTerminInfo();
     });
   </script>
 @endpush
