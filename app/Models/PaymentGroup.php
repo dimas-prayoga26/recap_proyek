@@ -17,7 +17,6 @@ class PaymentGroup extends Model
         'offer_rupiah_snapshot',
         'offer_usd_snapshot',
         'total_terms',
-        'fixed_total_terms',
         'paid_terms',
         'status',
     ];
@@ -29,7 +28,6 @@ class PaymentGroup extends Model
             'offer_rupiah_snapshot' => 'integer',
             'offer_usd_snapshot' => 'decimal:2',
             'total_terms' => 'integer',
-            'fixed_total_terms' => 'integer',
             'paid_terms' => 'integer',
         ];
     }

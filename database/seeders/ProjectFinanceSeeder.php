@@ -99,9 +99,8 @@ class ProjectFinanceSeeder extends Seeder
             [
                 'name' => 'Kuitansi #001',
                 'total_amount' => 3000000,
-                'total_terms' => 3,
-                'fixed_total_terms' => 3,
-                'paid_terms' => 2,
+                'total_terms' => 1,
+                'paid_terms' => 0,
                 'status' => 'berjalan',
             ],
         );

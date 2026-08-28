@@ -177,9 +177,9 @@
           </div>
           <span class="text-white d-block f-34 f-w-500 my-2">
             {{ $summary['income'] }}
-            <i class="ti ti-arrow-up-right-circle opacity-50"></i>
+            <i class="ti ti-arrow-down-left-circle opacity-50"></i>
           </span>
-          <p class="mb-0 opacity-75">Total Debet</p>
+          <p class="mb-0 opacity-75">Total Credit</p>
         </div>
       </div>
     </div>
@@ -203,9 +203,9 @@
           </div>
           <span class="text-white d-block f-34 f-w-500 my-2">
             {{ $summary['expense'] }}
-            <i class="ti ti-arrow-down-right-circle opacity-50"></i>
+            <i class="ti ti-arrow-up-right-circle opacity-50"></i>
           </span>
-          <p class="mb-0 opacity-75">Total Kredit</p>
+          <p class="mb-0 opacity-75">Total Debit</p>
         </div>
       </div>
     </div>
@@ -240,7 +240,7 @@
           <div class="row mb-3 align-items-center">
             <div class="col">
               <small class="text-muted">Arus Kas</small>
-              <h3>Debet vs Kredit</h3>
+              <h3>Credit vs Debit</h3>
             </div>
             <div class="col-auto">
               <select class="form-select p-r-35">
@@ -371,7 +371,7 @@
                     <td>{{ $transaction['group'] }}</td>
                     <td>
                       <span class="badge {{ $isIncomeTransaction ? 'bg-light-success text-success' : 'bg-light-danger text-danger' }}">
-                        {{ $isIncomeTransaction ? 'Masuk' : 'Keluar' }}
+                        {{ $isIncomeTransaction ? 'Credit' : 'Debit' }}
                       </span>
                     </td>
                     <td class="text-end">
@@ -434,8 +434,8 @@
         dataLabels: { enabled: false },
         colors: ['#2196f3', '#673ab7', '#ff9800'],
         series: [
-          { name: 'Debet', data: chartSeries.income },
-          { name: 'Kredit', data: chartSeries.expense },
+          { name: 'Credit', data: chartSeries.income },
+          { name: 'Debit', data: chartSeries.expense },
           { name: 'Saldo', data: chartSeries.balance }
         ],
         xaxis: {

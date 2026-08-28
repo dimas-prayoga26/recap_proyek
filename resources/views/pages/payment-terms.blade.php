@@ -82,7 +82,7 @@
           <div class="row align-items-center">
             <div class="col">
               <small class="text-muted">{{ $activeProject?->name ?? 'Belum ada project' }} · {{ $selectedAreaCode }}</small>
-              <h4 class="mb-0">Rekap Termin Pembayaran</h4>
+              <h4 class="mb-0">Rekap Pembayaran</h4>
             </div>
           </div>
         </div>
@@ -104,7 +104,7 @@
               </select>
             </div>
             <div>
-              <label for="term-count" class="form-label">Total Termin Rencana</label>
+              <label for="term-count" class="form-label">Jumlah Pembayaran</label>
               <select class="form-select" id="term-count" name="terms">
                 <option value="">Semua</option>
                 @foreach ($availableTermsOptions as $termsOption)
@@ -123,7 +123,6 @@
                 <tr>
                   <th>Pekerjaan</th>
                   <th class="text-end">Penawaran</th>
-                  <th>Total Fix Termin</th>
                   @for ($number = 1; $number <= $maxTermsColumn; $number++)
                     <th class="text-end">Pembayaran {{ $number }}</th>
                   @endfor
@@ -139,7 +138,6 @@
                       <span class="term-work-meta">{{ $row['work_item']->brand ?: $row['work_item']->vendor?->name ?? '-' }}</span>
                     </td>
                     <td class="term-amount-cell">{{ $formatRupiah($row['summary']['offer']) }}</td>
-                    <td>{{ $row['summary']['total_terms'] }}x</td>
                     @for ($number = 1; $number <= $maxTermsColumn; $number++)
                       <td class="term-amount-cell">
                         @if ($row['payments']->has($number))
@@ -156,7 +154,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="{{ 5 + $maxTermsColumn }}" class="text-center text-muted py-4">Belum ada pekerjaan di area ini.</td>
+                    <td colspan="{{ 4 + $maxTermsColumn }}" class="text-center text-muted py-4">Belum ada pekerjaan di area ini.</td>
                   </tr>
                 @endforelse
               </tbody>

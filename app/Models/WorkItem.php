@@ -17,12 +17,7 @@ class WorkItem extends Model
         'brand',
         'offer_rupiah',
         'offer_usd',
-        'fixed_total_terms',
         'notes',
-    ];
-
-    protected $attributes = [
-        'fixed_total_terms' => 8,
     ];
 
     protected function casts(): array
@@ -30,7 +25,6 @@ class WorkItem extends Model
         return [
             'offer_rupiah' => 'integer',
             'offer_usd' => 'decimal:2',
-            'fixed_total_terms' => 'integer',
         ];
     }
 

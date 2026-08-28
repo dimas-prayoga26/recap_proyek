@@ -1,9 +1,6 @@
 @php
   $isIncome = ($mode ?? 'masuk') === 'masuk';
   $transactionType = $isIncome ? 'masuk' : 'keluar';
-  $selectedCategory = old('transaction_category_id')
-    ? ($categories ?? collect())->firstWhere('id', (int) old('transaction_category_id'))
-    : ($categories ?? collect())->first();
   $selectedWorkItem = old('work_item_id')
     ? ($workItems ?? collect())->firstWhere('id', (int) old('work_item_id'))
     : (request()->query('work_item_id')
@@ -14,6 +11,9 @@
     : ($selectedWorkItem?->project_area_id
       ? ($projectAreas ?? collect())->firstWhere('id', $selectedWorkItem->project_area_id)
       : ($projectAreas ?? collect())->first());
+  $selectedProject = old('project_id')
+    ? ($projects ?? collect())->firstWhere('id', (int) old('project_id'))
+    : ($selectedProjectArea?->project ?? $activeProject);
   $selectedVendor = old('vendor_id')
     ? ($vendors ?? collect())->firstWhere('id', (int) old('vendor_id'))
     : $selectedWorkItem?->vendor;
@@ -30,7 +30,7 @@
   </a>
   <a href="{{ $isIncome ? route('uang-keluar.index') : route('uang-masuk.index') }}" class="btn btn-primary">
     <i class="ti {{ $isIncome ? 'ti-receipt-2' : 'ti-wallet' }} me-1"></i>
-    {{ $isIncome ? 'Input Uang Keluar' : 'Input Uang Masuk' }}
+    {{ $isIncome ? 'Input Debit' : 'Input Credit' }}
   </a>
 @endsection
 
@@ -126,6 +126,38 @@
     .work-termin-history {
       flex: 0 0 auto;
       width: auto;
+    }
+
+    .work-termin-toolbar {
+      align-items: center;
+      display: flex;
+      flex: 0 0 auto;
+      gap: 8px;
+    }
+
+    .termin-currency-switch {
+      background: #fff;
+      border: 1px solid #d7e9fb;
+      border-radius: 8px;
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+    }
+
+    .termin-currency-switch button {
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      color: #697586;
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 42px;
+      padding: 6px 10px;
+    }
+
+    .termin-currency-switch button.is-active {
+      background: #2196f3;
+      color: #fff;
     }
 
     .work-termin-package {
@@ -369,10 +401,10 @@
               <label class="form-label d-block">Jenis Transaksi</label>
               <div class="transaction-kind">
                 <a href="{{ route('uang-masuk.index') }}" class="btn {{ $isIncome ? 'btn-success' : 'btn-light-secondary' }}">
-                  <i class="ti ti-arrow-down-left me-1"></i> Uang Masuk
+                  <i class="ti ti-arrow-down-left me-1"></i> Credit
                 </a>
                 <a href="{{ route('uang-keluar.index') }}" class="btn {{ $isIncome ? 'btn-light-secondary' : 'btn-primary' }}">
-                  <i class="ti ti-arrow-up-right me-1"></i> Uang Keluar
+                  <i class="ti ti-arrow-up-right me-1"></i> Debit
                 </a>
               </div>
             </div>
@@ -380,37 +412,37 @@
             <div class="row">
               <div class="col-md-6">
                 <div class="mb-3">
-                  <label for="main-category" class="form-label">Project / Kategori Utama</label>
-                  <select class="form-select @error('project_area_id') is-invalid @enderror" id="main-category" name="project_area_id" required>
-                    @forelse (($projectAreas ?? collect()) as $area)
-                      <option value="{{ $area->id }}" @selected((int) old('project_area_id', $selectedProjectArea?->id) === $area->id)>
-                        {{ $area->name }}
+                  <label for="project-holding" class="form-label">Project Holding</label>
+                  <select class="form-select @error('project_id') is-invalid @enderror" id="project-holding" name="project_id" required>
+                    @forelse (($projects ?? collect()) as $project)
+                      <option value="{{ $project->id }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>
+                        {{ $project->name }}
                       </option>
                     @empty
-                      <option value="">Project belum tersedia</option>
+                      <option value="">Project holding belum tersedia</option>
+                    @endforelse
+                  </select>
+                  @error('project_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="main-category" class="form-label">Area / Kode</label>
+                  <select class="form-select @error('project_area_id') is-invalid @enderror" id="main-category" name="project_area_id" required>
+                    @forelse (($projectAreas ?? collect()) as $area)
+                      <option value="{{ $area->id }}" data-project-id="{{ $area->project_id }}" @selected((int) old('project_area_id', $selectedProjectArea?->id) === $area->id)>
+                        {{ $area->code }}
+                      </option>
+                    @empty
+                      <option value="">Area belum tersedia</option>
                     @endforelse
                   </select>
                   @error('project_area_id')
                     <div class="invalid-feedback">{{ $message }}</div>
                   @enderror
-                  <span class="form-helper">Dipakai untuk memisahkan laporan per project atau area kerja.</span>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="mb-3">
-                  <label for="category" class="form-label">Kategori</label>
-                  <select class="form-select @error('transaction_category_id') is-invalid @enderror" id="category" name="transaction_category_id" required>
-                    @forelse (($categories ?? collect()) as $category)
-                      <option value="{{ $category->id }}" @selected((int) old('transaction_category_id', $selectedCategory?->id) === $category->id)>
-                        {{ $category->name }}
-                      </option>
-                    @empty
-                      <option value="">Kategori belum tersedia</option>
-                    @endforelse
-                  </select>
-                  @error('transaction_category_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                  @enderror
+                  <span class="form-helper">K9/K8/C21 adalah area yang berada di bawah Project Holding.</span>
                 </div>
               </div>
             </div>
@@ -427,6 +459,7 @@
                         <option
                           value="{{ $item->id }}"
                           data-vendor-id="{{ $item->vendor_id }}"
+                          data-project-id="{{ $item->project_id }}"
                           data-area-id="{{ $item->project_area_id }}"
                           data-package-name="{{ $item->package_name }}"
                           data-package-label="{{ trim(($item->package_name ? 'Kategori: '.$item->package_name.' | ' : '').$item->packageItems->pluck('name')->join(', ')) }}"
@@ -474,7 +507,13 @@
                     <small class="text-muted">Info Termin</small>
                     <h5 class="mb-0" id="termin-info-title">-</h5>
                   </div>
-                  <select class="form-select form-select-sm work-termin-history" id="termin-info-history"></select>
+                  <div class="work-termin-toolbar">
+                    <div class="termin-currency-switch" id="termin-currency-switch">
+                      <button type="button" class="is-active" data-currency="IDR">IDR</button>
+                      <button type="button" data-currency="USD">USD</button>
+                    </div>
+                    <select class="form-select form-select-sm work-termin-history" id="termin-info-history"></select>
+                  </div>
                 </div>
                 <div class="work-termin-metrics">
                   <div class="work-termin-metric">
@@ -529,7 +568,7 @@
             <div class="mb-4">
               <label class="form-label d-block">Termin Pembayaran</label>
               @unless ($isIncome)
-                <span class="form-helper mb-2">Jika disimpan dari Uang Keluar, nominal ini otomatis masuk ke rekap Termin Pembayaran.</span>
+                <span class="form-helper mb-2">Jika disimpan dari Debit, nominal ini otomatis masuk ke rekap Termin Pembayaran.</span>
               @endunless
               <div class="termin-panel" id="termin-panel">
                 <div class="row">
@@ -560,8 +599,8 @@
                   </div>
                   <div class="col-md-6">
                     <div class="mb-0">
-                      <label for="payment-total" class="form-label">Total Termin Rencana</label>
-                      <input type="number" class="form-control" id="payment-total" name="payment_total" min="1" value="{{ old('payment_total', $selectedWorkItem?->fixed_total_terms ?? 8) }}" readonly />
+                      <label for="payment-total" class="form-label">Jumlah Termin Otomatis</label>
+                      <input type="number" class="form-control" id="payment-total" name="payment_total" min="1" value="{{ old('payment_total', $selectedWorkItem?->paymentGroups->first()?->total_terms ?? 1) }}" readonly />
                     </div>
                   </div>
                 </div>
@@ -638,13 +677,17 @@
               <h4 class="mb-0">Ringkasan Input</h4>
             </div>
             <span class="badge {{ $isIncome ? 'bg-light-success text-success' : 'bg-light-primary text-primary' }}" id="summary-type">
-              {{ $isIncome ? 'Uang Masuk' : 'Uang Keluar' }}
+              {{ $isIncome ? 'Credit' : 'Debit' }}
             </span>
           </div>
 
           <div class="summary-line">
-            <span>Project</span>
-            <strong id="summary-project">{{ $selectedProjectArea?->name ?? 'Belum tersedia' }}</strong>
+            <span>Project Holding</span>
+            <strong id="summary-project-holding">{{ $selectedProject?->name ?? 'Belum tersedia' }}</strong>
+          </div>
+          <div class="summary-line">
+            <span>Area / Kode</span>
+            <strong id="summary-project-area">{{ $selectedProjectArea?->code ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
             <span>Nama</span>
@@ -653,10 +696,6 @@
           <div class="summary-line">
             <span>Vendor</span>
             <strong id="summary-vendor">{{ $selectedVendor?->name ?? '-' }}</strong>
-          </div>
-          <div class="summary-line">
-            <span>Kategori</span>
-            <strong id="summary-category">{{ $selectedCategory?->name ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
             <span>Nominal</span>
@@ -685,8 +724,8 @@
     document.addEventListener('DOMContentLoaded', function () {
       const form = document.querySelector('#transaction-form');
       const dateInput = document.querySelector('#record-date');
+      const projectHoldingInput = document.querySelector('#project-holding');
       const projectInput = document.querySelector('#main-category');
-      const categoryInput = document.querySelector('#category');
       const activityInput = document.querySelector('#activity-name');
       const vendorInput = document.querySelector('#vendor-name');
       const amountInput = document.querySelector('#amount');
@@ -938,9 +977,42 @@
       const terminOffer = document.querySelector('#termin-info-offer');
       const terminPaid = document.querySelector('#termin-info-paid');
       const terminRemaining = document.querySelector('#termin-info-remaining');
+      const terminCurrencySwitch = document.querySelector('#termin-currency-switch');
+      const dollarFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
+      let terminCurrency = 'IDR';
+      let usdToIdrRate = null;
 
       function formatCurrency(value) {
         return 'Rp ' + rupiahFormatter.format(Number(value || 0));
+      }
+
+      function formatTerminCurrency(value) {
+        const amount = Number(value || 0);
+
+        if (terminCurrency !== 'USD') {
+          return formatCurrency(amount);
+        }
+
+        if (!usdToIdrRate) {
+          return 'USD -';
+        }
+
+        return 'USD ' + dollarFormatter.format(amount / usdToIdrRate);
+      }
+
+      async function fetchUsdRate() {
+        try {
+          const response = await fetch('https://open.er-api.com/v6/latest/USD', { cache: 'no-store' });
+          const data = await response.json();
+          const rate = Number(data && data.rates ? data.rates.IDR : 0);
+
+          if (rate > 0) {
+            usdToIdrRate = rate;
+            updateTerminInfo();
+          }
+        } catch (error) {
+          usdToIdrRate = null;
+        }
       }
 
       function currentTerminInfo() {
@@ -949,7 +1021,7 @@
           paid: 0,
           remaining: 0,
           next_payment_number: 1,
-          total_terms: 8,
+          total_terms: 1,
           terms: [],
         };
       }
@@ -1005,9 +1077,9 @@
           const terms = info.terms || [];
 
           terminTitle.textContent = selectedText(activityInput) || '-';
-          terminOffer.textContent = formatCurrency(info.offer);
-          terminPaid.textContent = formatCurrency(info.paid);
-          terminRemaining.textContent = formatCurrency(info.remaining);
+          terminOffer.textContent = formatTerminCurrency(info.offer);
+          terminPaid.textContent = formatTerminCurrency(info.paid);
+          terminRemaining.textContent = formatTerminCurrency(info.remaining);
           terminRemaining.classList.toggle('text-danger', Number(info.remaining) < 0);
           terminRemaining.classList.toggle('text-primary', Number(info.remaining) >= 0);
 
@@ -1015,15 +1087,19 @@
           terms.forEach(function (term) {
             const option = document.createElement('option');
             option.value = term.number;
-            option.textContent = 'Pembayaran ke-' + term.number + ' · ' + formatCurrency(term.amount);
+            option.textContent = 'Pembayaran ke-' + term.number + ' · ' + formatTerminCurrency(term.amount);
             terminHistory.appendChild(option);
           });
 
-          const upcomingOption = document.createElement('option');
-          upcomingOption.value = nextPaymentNumber;
-          upcomingOption.textContent = 'Pembayaran ke-' + nextPaymentNumber + ' · Belum dibayar';
-          terminHistory.appendChild(upcomingOption);
-          terminHistory.value = nextPaymentNumber;
+          if (Number(info.remaining || 0) > 0 || terms.length === 0) {
+            const upcomingOption = document.createElement('option');
+            upcomingOption.value = nextPaymentNumber;
+            upcomingOption.textContent = 'Pembayaran ke-' + nextPaymentNumber + ' · Belum dibayar';
+            terminHistory.appendChild(upcomingOption);
+            terminHistory.value = nextPaymentNumber;
+          } else {
+            terminHistory.value = terms.length > 0 ? terms[terms.length - 1].number : nextPaymentNumber;
+          }
 
           receiptTotalInput.value = info.offer || '';
           paymentTotalInput.value = Number(info.total_terms || 1);
@@ -1052,6 +1128,26 @@
         updateSummary();
       }
 
+      if (terminCurrencySwitch) {
+        terminCurrencySwitch.querySelectorAll('button').forEach(function (button) {
+          button.addEventListener('click', function () {
+            terminCurrency = button.dataset.currency || 'IDR';
+
+            terminCurrencySwitch.querySelectorAll('button').forEach(function (item) {
+              item.classList.toggle('is-active', item === button);
+            });
+
+            if (terminCurrency === 'USD' && !usdToIdrRate) {
+              fetchUsdRate();
+            }
+
+            updateTerminInfo();
+          });
+        });
+
+        fetchUsdRate();
+      }
+
       function selectedDayName() {
         if (!dateInput.value) {
           return '';
@@ -1073,10 +1169,10 @@
         const receiptLabel = receiptCodeInput.value.trim() || 'Kuitansi';
         const paymentLabel = receiptLabel + ' - ' + (paymentNumberInput.value || 1) + '/' + (paymentTotalInput.value || 1);
 
-        document.querySelector('#summary-project').textContent = selectedText(projectInput) || 'Belum tersedia';
+        document.querySelector('#summary-project-holding').textContent = selectedText(projectHoldingInput) || 'Belum tersedia';
+        document.querySelector('#summary-project-area').textContent = selectedText(projectInput) || 'Belum tersedia';
         document.querySelector('#summary-name').textContent = selectedText(activityInput) || 'Belum tersedia';
         document.querySelector('#summary-vendor').textContent = selectedText(vendorInput) || '-';
-        document.querySelector('#summary-category').textContent = selectedText(categoryInput) || 'Belum tersedia';
         document.querySelector('#summary-amount').textContent = formatCurrency(amountInput.value);
         document.querySelector('#summary-date').textContent = dateInput.value ? selectedDayName() + ', ' + dateInput.value : '-';
         document.querySelector('#summary-payment').textContent = paymentLabel;
@@ -1168,7 +1264,30 @@
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedBlob.size);
       }
 
-      [dateInput, projectInput, categoryInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
+      function refreshAreasForProjectHolding() {
+        const projectId = projectHoldingInput.value;
+        const areaOptions = Array.from(projectInput.options).filter(function (option) {
+          return option.value !== '';
+        });
+        const matchingOptions = areaOptions.filter(function (option) {
+          return option.dataset.projectId === projectId;
+        });
+
+        areaOptions.forEach(function (option) {
+          const isVisible = option.dataset.projectId === projectId;
+          option.hidden = !isVisible;
+          option.disabled = !isVisible;
+        });
+
+        if (!projectInput.value || !projectInput.selectedOptions[0] || projectInput.selectedOptions[0].dataset.projectId !== projectId) {
+          projectInput.value = matchingOptions[0] ? matchingOptions[0].value : '';
+          projectInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        updateSummary();
+      }
+
+      [dateInput, projectHoldingInput, projectInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
         input.addEventListener('input', function () {
           updateSummary();
         });
@@ -1179,6 +1298,7 @@
       });
 
       activityInput.addEventListener('change', syncVendorFromWorkItem);
+      projectHoldingInput.addEventListener('change', refreshAreasForProjectHolding);
       receiptFileInput.addEventListener('change', handleReceiptFile);
 
       paymentTotalInput.addEventListener('input', function () {
@@ -1228,6 +1348,7 @@
       });
 
       updateTerminInfo();
+      refreshAreasForProjectHolding();
     });
   </script>
 @endpush

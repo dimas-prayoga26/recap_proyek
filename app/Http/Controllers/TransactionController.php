@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
+use App\Models\Project;
 use App\Models\ProjectArea;
 use App\Models\ProjectTransaction;
 use App\Models\ProjectTransactionAllocation;
@@ -25,20 +26,21 @@ class TransactionController extends Controller
 
     public function createIncome(): View
     {
-        return $this->create('masuk', 'Input Uang Masuk');
+        return $this->create('masuk', 'Input Credit');
     }
 
     public function createExpense(): View
     {
-        return $this->create('keluar', 'Input Uang Keluar');
+        return $this->create('keluar', 'Input Debit');
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'type' => ['required', Rule::in(['masuk', 'keluar'])],
+            'project_id' => ['required', 'exists:projects,id'],
             'project_area_id' => ['required', 'exists:project_areas,id'],
-            'transaction_category_id' => ['required', 'exists:transaction_categories,id'],
+            'transaction_category_id' => ['nullable', 'exists:transaction_categories,id'],
             'work_item_id' => ['required', 'exists:work_items,id'],
             'vendor_id' => ['nullable', 'exists:vendors,id'],
             'amount' => ['required', 'integer', 'min:0'],
@@ -58,6 +60,25 @@ class TransactionController extends Controller
 
         $projectArea = ProjectArea::query()->findOrFail($validated['project_area_id']);
         $workItem = WorkItem::query()->findOrFail($validated['work_item_id']);
+
+        if ((int) $projectArea->project_id !== (int) $validated['project_id'] || (int) $workItem->project_id !== (int) $validated['project_id']) {
+            throw ValidationException::withMessages([
+                'project_id' => 'Project Holding, area, dan pekerjaan harus dari project yang sama.',
+            ]);
+        }
+
+        if ((int) $workItem->project_area_id !== (int) $projectArea->id) {
+            throw ValidationException::withMessages([
+                'work_item_id' => 'Pekerjaan harus sesuai dengan area/kode yang dipilih.',
+            ]);
+        }
+
+        $transactionCategoryId = $validated['transaction_category_id']
+            ?? TransactionCategory::query()
+                ->where('type', $validated['type'])
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->value('id');
         $additionalAllocations = $this->additionalAllocations($validated, $projectArea);
         $additionalTotal = (int) $additionalAllocations->sum('amount');
 
@@ -67,19 +88,8 @@ class TransactionController extends Controller
                 ->withInput();
         }
 
-        if (
-            $validated['type'] === 'keluar'
-            && filled($validated['payment_number'] ?? null)
-            && (int) $validated['payment_number'] > (int) $workItem->fixed_total_terms
-        ) {
-            return back()
-                ->withErrors(['payment_number' => 'Pembayaran ke tidak boleh lebih besar dari Total Termin Rencana.'])
-                ->withInput();
-        }
-
-        $transaction = DB::transaction(function () use ($request, $validated, $projectArea, $workItem, $additionalAllocations, $additionalTotal) {
+        $transaction = DB::transaction(function () use ($request, $validated, $projectArea, $workItem, $transactionCategoryId, $additionalAllocations, $additionalTotal) {
             $paymentGroup = $this->paymentGroupFromTransaction($validated, $projectArea, $workItem);
-            $fixedTotalTerms = max(1, (int) $workItem->fixed_total_terms);
             $primaryAmount = $validated['type'] === 'keluar'
                 ? $validated['amount'] - $additionalTotal
                 : $validated['amount'];
@@ -87,7 +97,7 @@ class TransactionController extends Controller
             $transaction = ProjectTransaction::create([
                 'project_id' => $projectArea->project_id,
                 'project_area_id' => $projectArea->id,
-                'transaction_category_id' => $validated['transaction_category_id'],
+                'transaction_category_id' => $transactionCategoryId,
                 'work_item_id' => $workItem->id,
                 'vendor_id' => $validated['vendor_id'] ?? null,
                 'payment_group_id' => $paymentGroup?->id,
@@ -95,7 +105,7 @@ class TransactionController extends Controller
                 'amount' => $validated['amount'],
                 'recorded_at' => $validated['recorded_at'],
                 'payment_number' => $validated['payment_number'] ?? null,
-                'payment_total' => $validated['type'] === 'keluar' ? $fixedTotalTerms : ($validated['payment_total'] ?? null),
+                'payment_total' => $validated['type'] === 'keluar' ? null : ($validated['payment_total'] ?? null),
                 'receipt_total' => $validated['receipt_total'] ?? null,
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -107,10 +117,10 @@ class TransactionController extends Controller
                     $primaryAmount,
                     $validated['recorded_at'],
                     $validated['notes'] ?? null,
-                    $fixedTotalTerms,
                 );
 
                 $this->recordAllocation($transaction, $workItem, $paymentGroup, $paymentTerm, $primaryAmount, 'primary', $validated['notes'] ?? null);
+                $transaction->forceFill(['payment_total' => $paymentGroup->refresh()->total_terms])->save();
             }
 
             foreach ($additionalAllocations as $allocation) {
@@ -122,7 +132,6 @@ class TransactionController extends Controller
                     $allocation['amount'],
                     $validated['recorded_at'],
                     $allocation['notes'] ?? 'Alokasi dari transaksi '.$transaction->id,
-                    max(1, (int) $targetWorkItem->fixed_total_terms),
                 );
 
                 $this->recordAllocation($transaction, $targetWorkItem, $targetGroup, $targetTerm, $allocation['amount'], 'additional', $allocation['notes'] ?? null);
@@ -154,6 +163,11 @@ class TransactionController extends Controller
     private function create(string $type, string $title): View
     {
         $activeProject = $this->activeProject();
+        $projects = Project::query()
+            ->where('status', 'active')
+            ->with('areas')
+            ->orderBy('name')
+            ->get();
 
         $categories = TransactionCategory::query()
             ->where('type', $type)
@@ -162,7 +176,7 @@ class TransactionController extends Controller
             ->get();
         $workItems = WorkItem::query()
             ->with(['packageItems.vendor', 'paymentGroups.terms', 'projectArea', 'vendor'])
-            ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
+            ->whereHas('project', fn ($query) => $query->where('status', 'active'))
             ->orderBy('package_name')
             ->orderBy('name')
             ->get();
@@ -171,9 +185,11 @@ class TransactionController extends Controller
             'mode' => $type,
             'title' => $title,
             'activeProject' => $activeProject,
+            'projects' => $projects,
             'projectAreas' => ProjectArea::query()
                 ->with('project')
-                ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
+                ->whereHas('project', fn ($query) => $query->where('status', 'active'))
+                ->orderBy('project_id')
                 ->orderBy('name')
                 ->get(),
             'categories' => $categories,
@@ -217,21 +233,6 @@ class TransactionController extends Controller
             ]);
         }
 
-        $fixedTermsByWorkItem = WorkItem::query()
-            ->whereIn('id', $validWorkItemIds)
-            ->pluck('fixed_total_terms', 'id');
-
-        $invalidAllocation = $allocations->first(function (array $allocation) use ($fixedTermsByWorkItem): bool {
-            return filled($allocation['payment_number'])
-                && (int) $allocation['payment_number'] > (int) ($fixedTermsByWorkItem[$allocation['work_item_id']] ?? 8);
-        });
-
-        if ($invalidAllocation) {
-            throw ValidationException::withMessages([
-                'allocations' => 'Pembayaran ke pada alokasi tambahan tidak boleh lebih besar dari Total Termin Rencana pekerjaan tujuan.',
-            ]);
-        }
-
         return $allocations;
     }
 
@@ -249,12 +250,11 @@ class TransactionController extends Controller
             $projectArea,
             $workItem,
             $code,
-            max(1, (int) $workItem->fixed_total_terms),
             $validated['receipt_total'] ?? null,
         );
     }
 
-    private function paymentGroupForWorkItem(ProjectArea $projectArea, WorkItem $workItem, ?string $code = null, ?int $paymentTotal = null, ?int $totalAmount = null): PaymentGroup
+    private function paymentGroupForWorkItem(ProjectArea $projectArea, WorkItem $workItem, ?string $code = null, ?int $totalAmount = null): PaymentGroup
     {
         $code ??= 'Termin-'.$workItem->id;
         $offerRupiah = (int) ($workItem->offer_rupiah ?? 0);
@@ -278,22 +278,19 @@ class TransactionController extends Controller
             ]);
         }
 
-        $fixedTotalTerms = $paymentTotal ?? $workItem->fixed_total_terms ?? $paymentGroup->fixed_total_terms ?? $paymentGroup->total_terms ?? 8;
-
         $paymentGroup->fill([
             'work_item_id' => $workItem->id,
             'total_amount' => $totalAmount ?? $offerRupiah,
             'offer_rupiah_snapshot' => $offerRupiah,
             'offer_usd_snapshot' => $workItem->offer_usd,
-            'total_terms' => max(1, $paymentGroup->total_terms ?: 1, $fixedTotalTerms),
-            'fixed_total_terms' => max(1, $fixedTotalTerms),
+            'total_terms' => $this->automaticTotalTermsForGroup($paymentGroup),
         ]);
         $paymentGroup->save();
 
         return $paymentGroup;
     }
 
-    private function syncPaymentTerm(PaymentGroup $paymentGroup, int $paymentNumber, int $amount, string $paidAt, ?string $notes, ?int $paymentTotal): PaymentTerm
+    private function syncPaymentTerm(PaymentGroup $paymentGroup, int $paymentNumber, int $amount, string $paidAt, ?string $notes): PaymentTerm
     {
         $paymentTerm = PaymentTerm::updateOrCreate(
             [
@@ -309,8 +306,7 @@ class TransactionController extends Controller
 
         $paymentGroup->update([
             'paid_terms' => $paymentGroup->terms()->count(),
-            'total_terms' => max($paymentGroup->total_terms, $paymentTotal ?? 1, $paymentNumber),
-            'fixed_total_terms' => max(1, $paymentTotal ?? $paymentGroup->fixed_total_terms ?? $paymentGroup->total_terms ?? $paymentNumber),
+            'total_terms' => $this->automaticTotalTermsForGroup($paymentGroup),
         ]);
 
         return $paymentTerm;
@@ -332,7 +328,30 @@ class TransactionController extends Controller
 
     private function nextPaymentNumber(PaymentGroup $paymentGroup): int
     {
-        return ((int) $paymentGroup->terms()->max('payment_number')) + 1;
+        $highestPaymentNumber = (int) $paymentGroup->terms()->max('payment_number');
+        $remaining = $this->remainingAmountForGroup($paymentGroup);
+
+        return $remaining > 0 ? $highestPaymentNumber + 1 : max($highestPaymentNumber, 1);
+    }
+
+    private function automaticTotalTermsForGroup(PaymentGroup $paymentGroup): int
+    {
+        $highestPaymentNumber = (int) $paymentGroup->terms()->max('payment_number');
+        $remaining = $this->remainingAmountForGroup($paymentGroup);
+
+        if ($remaining > 0) {
+            return max($highestPaymentNumber + 1, 1);
+        }
+
+        return max($highestPaymentNumber, 1);
+    }
+
+    private function remainingAmountForGroup(PaymentGroup $paymentGroup): int
+    {
+        $offer = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
+        $paid = (int) $paymentGroup->terms()->sum('amount');
+
+        return $offer - $paid;
     }
 
     private function workItemTerminInfo(Collection $workItems): array
@@ -352,11 +371,9 @@ class TransactionController extends Controller
                     ->values() ?? collect();
                 $offer = (int) ($paymentGroup?->offer_rupiah_snapshot ?? $paymentGroup?->total_amount ?? $workItem->offer_rupiah ?? 0);
                 $paid = (int) $terms->sum('amount');
-                $totalTerms = max(
-                    (int) ($workItem->fixed_total_terms ?? $paymentGroup?->fixed_total_terms ?? $paymentGroup?->total_terms ?? 8),
-                    (int) ($terms->max('number') ?? 1),
-                    1,
-                );
+                $remaining = $offer - $paid;
+                $highestPaymentNumber = (int) ($terms->max('number') ?? 0);
+                $totalTerms = $remaining > 0 ? max($highestPaymentNumber + 1, 1) : max($highestPaymentNumber, 1);
 
                 /** @var Collection<int, array{name: string, amount: int}> $allocations */
                 $allocations = $sharedAllocations->get($workItem->id, collect());
@@ -366,10 +383,10 @@ class TransactionController extends Controller
                     $workItem->id => [
                         'offer' => $offer,
                         'paid' => $paid + $allocatedToOthers,
-                        'remaining' => $offer - $paid,
+                        'remaining' => $remaining,
                         'allocated_to_others' => $allocatedToOthers,
                         'shared_allocations' => $allocations->values(),
-                        'next_payment_number' => ((int) ($terms->max('number') ?? 0)) + 1,
+                        'next_payment_number' => $remaining > 0 ? $highestPaymentNumber + 1 : max($highestPaymentNumber, 1),
                         'total_terms' => $totalTerms,
                         'terms' => $terms,
                         'package_name' => $workItem->package_name,

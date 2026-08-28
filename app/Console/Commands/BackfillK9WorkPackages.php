@@ -378,7 +378,6 @@ class BackfillK9WorkPackages extends Command
             'brand' => $package['brand'],
             'offer_rupiah' => $package['rupiah'],
             'offer_usd' => $package['usd'],
-            'fixed_total_terms' => max(8, $package['payments'] === [] ? 1 : max(array_keys($package['payments']))),
             'notes' => $this->signature($package),
         ]);
         $workItem->save();
@@ -484,17 +483,13 @@ class BackfillK9WorkPackages extends Command
             ]);
         }
 
-        $importedTotalTerms = max(array_keys($payments));
-        $fixedTotalTerms = $workItem->fixed_total_terms ?? $paymentGroup->fixed_total_terms ?? $paymentGroup->total_terms ?? $importedTotalTerms;
-
         $paymentGroup->fill([
             'work_item_id' => $workItem->id,
             'name' => $package['name'],
             'total_amount' => (int) ($package['rupiah'] ?? 0),
             'offer_rupiah_snapshot' => (int) ($package['rupiah'] ?? 0),
             'offer_usd_snapshot' => $package['usd'],
-            'total_terms' => max($importedTotalTerms, $paymentGroup->total_terms ?: 1, $fixedTotalTerms),
-            'fixed_total_terms' => max(1, $fixedTotalTerms),
+            'total_terms' => 1,
         ]);
         $paymentGroup->save();
 
@@ -513,7 +508,10 @@ class BackfillK9WorkPackages extends Command
             ->whereNotIn('payment_number', array_keys($payments))
             ->delete();
 
-        $paymentGroup->update(['paid_terms' => $paymentGroup->terms()->count()]);
+        $paymentGroup->update([
+            'paid_terms' => $paymentGroup->terms()->count(),
+            'total_terms' => $this->automaticTotalTerms($paymentGroup),
+        ]);
 
         return count($payments) + $this->syncOverflowPaymentTerms($workItem, $package);
     }
@@ -550,7 +548,6 @@ class BackfillK9WorkPackages extends Command
                 'name' => $overflow['name'],
                 'brand' => $overflow['brand'],
                 'offer_rupiah' => $overflow['rupiah'],
-                'fixed_total_terms' => 8,
                 'notes' => 'Import item limpahan pembayaran dari sheet K9 baris '.$package['start_row'].'.',
             ]);
         }
@@ -569,17 +566,13 @@ class BackfillK9WorkPackages extends Command
             ]);
         }
 
-        $importedTotalTerms = max(array_keys($overflowPayments));
-        $fixedTotalTerms = $targetWorkItem->fixed_total_terms ?? $targetGroup->fixed_total_terms ?? $targetGroup->total_terms ?? $importedTotalTerms;
-
         $targetGroup->fill([
             'work_item_id' => $targetWorkItem->id,
             'name' => $targetWorkItem->name,
             'total_amount' => (int) ($targetWorkItem->offer_rupiah ?? $overflow['rupiah']),
             'offer_rupiah_snapshot' => (int) ($targetWorkItem->offer_rupiah ?? $overflow['rupiah']),
             'offer_usd_snapshot' => $targetWorkItem->offer_usd,
-            'total_terms' => max($importedTotalTerms, $targetGroup->total_terms ?: 1, $fixedTotalTerms),
-            'fixed_total_terms' => max(1, $fixedTotalTerms),
+            'total_terms' => 1,
         ]);
         $targetGroup->save();
 
@@ -594,9 +587,25 @@ class BackfillK9WorkPackages extends Command
             );
         }
 
-        $targetGroup->update(['paid_terms' => $targetGroup->terms()->count()]);
+        $targetGroup->update([
+            'paid_terms' => $targetGroup->terms()->count(),
+            'total_terms' => $this->automaticTotalTerms($targetGroup),
+        ]);
 
         return count($overflowPayments);
+    }
+
+    private function automaticTotalTerms(PaymentGroup $paymentGroup): int
+    {
+        $offer = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
+        $paid = (int) $paymentGroup->terms()->sum('amount');
+        $highestPaymentNumber = (int) $paymentGroup->terms()->max('payment_number');
+
+        if ($offer - $paid > 0) {
+            return max($highestPaymentNumber + 1, 1);
+        }
+
+        return max($highestPaymentNumber, 1);
     }
 
     /**

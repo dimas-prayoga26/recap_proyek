@@ -1,3 +1,10 @@
+@php
+  $selectedProject = old('project_id')
+    ? ($projects ?? collect())->firstWhere('id', (int) old('project_id'))
+    : $activeProject;
+  $selectedArea = old('area', $filters['area'] ?? ($areas ?? collect())->first()?->code ?? 'K9');
+@endphp
+
 @extends('layouts.app')
 
 @section('title', $title)
@@ -5,7 +12,7 @@
 
 @section('page_actions')
   <a href="{{ route('project.index') }}" class="btn btn-light-secondary">
-    <i class="ti ti-folders me-1"></i> Project
+    <i class="ti ti-folders me-1"></i> Project Holding
   </a>
   <a href="{{ route('uang-keluar.index') }}" class="btn btn-primary">
     <i class="ti ti-plus me-1"></i> Input Transaksi
@@ -187,7 +194,7 @@
             </div>
             <div>
               <h4 class="mb-1" id="offer-form-title-text">Input Kategori Pekerjaan</h4>
-              <p class="text-muted mb-0">{{ $activeProject?->name ?? 'Belum ada project aktif' }}</p>
+              <p class="text-muted mb-0">{{ $activeProject?->name ?? 'Belum ada project holding aktif' }}</p>
             </div>
           </div>
 
@@ -213,41 +220,44 @@
             @csrf
             <input type="hidden" name="_method" id="offer-form-method" value="" />
             <input type="hidden" name="is_package" id="is-package-input" value="0" />
-            <div class="mb-4">
-              <label for="area-select" class="form-label d-block">Project / Kategori Utama</label>
-              <select class="form-select @error('area') is-invalid @enderror" id="area-select" name="area" required>
-                @forelse (($areas ?? collect()) as $areaOption)
-                  <option value="{{ $areaOption }}" @selected(old('area', 'K9') === $areaOption)>{{ $areaOption }}</option>
-                @empty
-                  <option value="K9" selected>K9</option>
-                @endforelse
-                <option value="__new__" @selected(old('area') === '__new__')>+ Tambah Kategori Baru</option>
-              </select>
-              @error('area')
-                <div class="invalid-feedback">{{ $message }}</div>
-              @enderror
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-4">
+                  <label for="project-select" class="form-label d-block">Project Holding</label>
+                  <select class="form-select @error('project_id') is-invalid @enderror" id="project-select" name="project_id" required>
+                    @forelse (($projects ?? collect()) as $project)
+                      <option value="{{ $project->id }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>{{ $project->name }}</option>
+                    @empty
+                      <option value="">Project holding belum tersedia</option>
+                    @endforelse
+                  </select>
+                  @error('project_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-4">
+                  <label for="area-select" class="form-label d-block">Area / Kode</label>
+                  <select class="form-select @error('area') is-invalid @enderror" id="area-select" name="area" required>
+                    @forelse (($areas ?? collect()) as $areaOption)
+                      <option value="{{ $areaOption->code }}" @selected($selectedArea === $areaOption->code)>{{ $areaOption->code }}</option>
+                    @empty
+                      <option value="K9" selected>K9</option>
+                    @endforelse
+                    <option value="__new__" @selected(old('area') === '__new__')>+ Tambah Area/Kode Baru</option>
+                  </select>
+                  @error('area')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
+                  <span class="form-helper">K9/K8/C21 adalah area di bawah Project Holding yang dipilih.</span>
+                </div>
+              </div>
             </div>
 
             <div class="mb-4 form-check">
               <input type="checkbox" class="form-check-input" id="package-toggle" />
               <label class="form-check-label" for="package-toggle">Ini paket gabungan beberapa area/pekerjaan (harga satu paket)</label>
-            </div>
-
-            <div class="mb-4">
-              <label for="fixed-total-terms" class="form-label">Total Fix Termin</label>
-              <input
-                type="number"
-                class="form-control @error('fixed_total_terms') is-invalid @enderror"
-                id="fixed-total-terms"
-                name="fixed_total_terms"
-                value="{{ old('fixed_total_terms', 8) }}"
-                min="1"
-                max="24"
-                required
-              />
-              @error('fixed_total_terms')
-                <div class="invalid-feedback">{{ $message }}</div>
-              @enderror
             </div>
 
             <div class="row">
@@ -381,10 +391,6 @@
             <span>Rupiah</span>
             <strong id="summary-idr">Rp 0</strong>
           </div>
-          <div class="offer-summary-line">
-            <span>Total Fix Termin</span>
-            <strong id="summary-terms">8x</strong>
-          </div>
         </div>
       </div>
     </div>
@@ -416,10 +422,11 @@
               />
             </div>
             <div>
+              <input type="hidden" name="project_id" value="{{ $filters['project_id'] }}" />
               <label for="filter-area" class="form-label">Area</label>
               <select class="form-select" id="filter-area" name="area">
                 @foreach ($areas as $area)
-                  <option value="{{ $area }}" @selected(($filters['area'] ?? 'K9') === $area)>{{ $area }}</option>
+                  <option value="{{ $area->code }}" @selected(($filters['area'] ?? 'K9') === $area->code)>{{ $area->code }}</option>
                 @endforeach
               </select>
             </div>
@@ -458,7 +465,6 @@
                   <th>Brand</th>
                   <th class="text-end">USD</th>
                   <th class="text-end">Rupiah</th>
-                  <th>Termin</th>
                   <th>Catatan</th>
                   <th class="text-end">Aksi</th>
                 </tr>
@@ -466,7 +472,7 @@
               <tbody id="offer-table-body">
                 @forelse ($offers->getCollection()->groupBy('area') as $areaName => $areaOffers)
                   <tr class="offer-group-row">
-                    <td colspan="7">{{ $areaName }} · {{ $areaOffers->count() }} data</td>
+                    <td colspan="6">{{ $areaName }} · {{ $areaOffers->count() }} data</td>
                   </tr>
                   @foreach ($areaOffers as $offer)
                     <tr>
@@ -483,19 +489,18 @@
                       <td>{{ $offer->brand ?: '-' }}</td>
                       <td class="text-end">{{ $offer->penawaran_usd ? 'USD '.number_format((float) $offer->penawaran_usd, 2, '.', ',') : '-' }}</td>
                       <td class="text-end">{{ $offer->penawaran_rupiah ? 'Rp '.number_format($offer->penawaran_rupiah, 0, ',', '.') : '-' }}</td>
-                      <td>{{ $offer->workItem?->fixed_total_terms ?? 8 }}x</td>
                       <td>{{ $offer->catatan ?: '-' }}</td>
                       <td class="text-end">
                         <button
                           type="button"
                           class="btn btn-sm btn-light-secondary offer-edit-btn"
                           data-id="{{ $offer->id }}"
+                          data-project-id="{{ $offer->project_id }}"
                           data-area="{{ $offer->area }}"
                           data-pekerjaan="{{ $offer->pekerjaan }}"
                           data-brand="{{ $offer->brand }}"
                           data-usd="{{ $offer->penawaran_usd }}"
                           data-rupiah="{{ $offer->penawaran_rupiah }}"
-                          data-fixed-total-terms="{{ $offer->workItem?->fixed_total_terms ?? 8 }}"
                           data-catatan="{{ $offer->catatan }}"
                           data-package-items="{{ $offer->workItem?->packageItems?->map(fn ($item) => ['name' => $item->name, 'brand' => $item->brand])->values()->toJson(JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?? '[]' }}"
                         >
@@ -506,7 +511,7 @@
                   @endforeach
                 @empty
                   <tr>
-                    <td colspan="7" class="text-center text-muted py-4">Belum ada kategori pekerjaan.</td>
+                    <td colspan="6" class="text-center text-muted py-4">Belum ada kategori pekerjaan.</td>
                   </tr>
                 @endforelse
               </tbody>
@@ -531,6 +536,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const form = document.querySelector('#offer-form');
+      const projectSelect = document.querySelector('#project-select');
       const areaSelect = document.querySelector('#area-select');
       const newAreaModalEl = document.querySelector('#new-area-modal');
       const newAreaModal = new bootstrap.Modal(newAreaModalEl);
@@ -544,7 +550,6 @@
       const brandFieldWrapper = document.querySelector('#brand-field-wrapper');
       const usdInput = document.querySelector('#offer-usd');
       const idrInput = document.querySelector('#offer-idr');
-      const fixedTotalTermsInput = document.querySelector('#fixed-total-terms');
       const notesInput = document.querySelector('#offer-notes');
       const idrFormatter = new Intl.NumberFormat('id-ID');
       const usdFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -652,11 +657,14 @@
           : (brandInput.value.trim() || '-');
         document.querySelector('#summary-usd').textContent = formatUsd(usdInput.value);
         document.querySelector('#summary-idr').textContent = formatIdr(idrInput.value);
-        document.querySelector('#summary-terms').textContent = (fixedTotalTermsInput.value || 8) + 'x';
       }
 
-      [workInput, brandInput, usdInput, idrInput, fixedTotalTermsInput].forEach(function (input) {
+      [workInput, brandInput, usdInput, idrInput].forEach(function (input) {
         input.addEventListener('input', updateSummary);
+      });
+
+      projectSelect.addEventListener('change', function () {
+        window.location.href = '{{ route('kategori-pekerjaan.index') }}?project_id=' + encodeURIComponent(projectSelect.value);
       });
 
       areaSelect.addEventListener('change', function () {
@@ -764,11 +772,11 @@
         const packageEntries = storedPackageEntries.length > 0 ? storedPackageEntries : parsePackageNote(data.catatan);
 
         areaSelect.value = data.area;
+        projectSelect.value = data.projectId || projectSelect.value;
         lastValidAreaValue = data.area;
         brandInput.value = data.brand || '';
         usdInput.value = data.usd || '';
         idrInput.value = data.rupiah || '';
-        fixedTotalTermsInput.value = data.fixedTotalTerms || 8;
         notesInput.value = data.catatan || '';
 
         if (packageEntries) {

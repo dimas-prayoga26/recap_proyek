@@ -159,7 +159,6 @@ class ImportKemangWorkItems extends Command
                             'brand' => $brand !== '' ? $brand : null,
                             'offer_rupiah' => $rupiah !== null ? (int) round($rupiah) : null,
                             'offer_usd' => $usd,
-                            'fixed_total_terms' => 8,
                         ]);
 
                         $created++;
@@ -237,7 +236,7 @@ class ImportKemangWorkItems extends Command
             return 0;
         }
 
-        $paymentGroup = $this->paymentGroupFor($workItem, max(array_keys($payments)));
+        $paymentGroup = $this->paymentGroupFor($workItem);
 
         foreach ($payments as $number => $amount) {
             PaymentTerm::updateOrCreate(
@@ -250,12 +249,15 @@ class ImportKemangWorkItems extends Command
             );
         }
 
-        $paymentGroup->update(['paid_terms' => $paymentGroup->terms()->count()]);
+        $paymentGroup->update([
+            'paid_terms' => $paymentGroup->terms()->count(),
+            'total_terms' => $this->automaticTotalTerms($paymentGroup),
+        ]);
 
         return count($payments);
     }
 
-    private function paymentGroupFor(WorkItem $workItem, int $totalTerms): PaymentGroup
+    private function paymentGroupFor(WorkItem $workItem): PaymentGroup
     {
         $code = 'Termin-'.$workItem->id;
         $offerRupiah = (int) ($workItem->offer_rupiah ?? 0);
@@ -277,19 +279,29 @@ class ImportKemangWorkItems extends Command
             ]);
         }
 
-        $fixedTotalTerms = $workItem->fixed_total_terms ?? $paymentGroup->fixed_total_terms ?? $paymentGroup->total_terms ?? $totalTerms;
-
         $paymentGroup->fill([
             'work_item_id' => $workItem->id,
             'total_amount' => $offerRupiah,
             'offer_rupiah_snapshot' => $offerRupiah,
             'offer_usd_snapshot' => $workItem->offer_usd,
-            'total_terms' => max($totalTerms, $paymentGroup->total_terms ?: 1, $fixedTotalTerms),
-            'fixed_total_terms' => max(1, $fixedTotalTerms),
+            'total_terms' => 1,
         ]);
         $paymentGroup->save();
 
         return $paymentGroup;
+    }
+
+    private function automaticTotalTerms(PaymentGroup $paymentGroup): int
+    {
+        $offer = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
+        $paid = (int) $paymentGroup->terms()->sum('amount');
+        $highestPaymentNumber = (int) $paymentGroup->terms()->max('payment_number');
+
+        if ($offer - $paid > 0) {
+            return max($highestPaymentNumber + 1, 1);
+        }
+
+        return max($highestPaymentNumber, 1);
     }
 
     /**

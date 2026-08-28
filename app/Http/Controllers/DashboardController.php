@@ -144,14 +144,12 @@ class DashboardController extends Controller
             return null;
         }
 
-        $totalTerms = max(1, $paymentGroup->workItem?->fixed_total_terms ?? $paymentGroup->fixed_total_terms ?? $paymentGroup->total_terms);
-        $paidTerms = $paymentGroup->terms->isNotEmpty()
-            ? $paymentGroup->terms->count()
-            : min($paymentGroup->paid_terms, $totalTerms);
-        $paidAmount = $paymentGroup->terms->isNotEmpty()
-            ? (int) $paymentGroup->terms->sum('amount')
-            : (int) round(($paymentGroup->total_amount / $totalTerms) * $paidTerms);
-        $remainingAmount = $paymentGroup->total_amount - $paidAmount;
+        $totalAmount = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
+        $paidTerms = $paymentGroup->terms->count();
+        $paidAmount = (int) $paymentGroup->terms->sum('amount');
+        $remainingAmount = $totalAmount - $paidAmount;
+        $highestPaymentNumber = (int) $paymentGroup->terms->max('payment_number');
+        $totalTerms = $remainingAmount > 0 ? $highestPaymentNumber + 1 : max($highestPaymentNumber, 1);
 
         return [
             'code' => $paymentGroup->code,
@@ -184,7 +182,7 @@ class DashboardController extends Controller
                 'area' => $transaction->projectArea?->name ?? $project->name,
                 'category' => $transaction->category?->name ?? '-',
                 'group' => $transaction->paymentGroup
-                    ? $transaction->paymentGroup->code.' - '.($transaction->payment_number ?? 1).'/'.($transaction->workItem?->fixed_total_terms ?? $transaction->paymentGroup->fixed_total_terms ?? $transaction->payment_total ?? $transaction->paymentGroup->total_terms)
+                    ? $transaction->paymentGroup->code.' - '.($transaction->payment_number ?? 1).'/'.($transaction->payment_total ?? $transaction->paymentGroup->total_terms ?? 1)
                     : '-',
                 'type' => $transaction->type,
                 'amount' => $this->formatRupiah($transaction->amount),

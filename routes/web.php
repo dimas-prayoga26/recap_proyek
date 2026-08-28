@@ -20,7 +20,7 @@ Route::put('/kategori-pekerjaan/{projectOffer}', [ProjectOfferController::class,
 
 Route::view('/kategori', 'pages.placeholder', [
     'title' => 'Kategori Transaksi',
-    'description' => 'Halaman master kategori untuk uang masuk dan uang keluar.',
+    'description' => 'Halaman master kategori untuk credit dan debit.',
     'icon' => 'ti ti-tag',
 ])->name('kategori.index');
 
@@ -31,7 +31,6 @@ Route::post('/transaksi', [TransactionController::class, 'store'])->name('transa
 
 Route::redirect('/kelompok-pembayaran', '/termin-pembayaran')->name('kelompok-pembayaran.index');
 Route::get('/termin-pembayaran', [PaymentTermController::class, 'index'])->name('termin-pembayaran.index');
-Route::patch('/termin-pembayaran/{workItem}', [PaymentTermController::class, 'update'])->name('termin-pembayaran.update');
 
 Route::view('/bukti-transaksi', 'pages.placeholder', [
     'title' => 'Bukti Transaksi',
@@ -41,7 +40,7 @@ Route::view('/bukti-transaksi', 'pages.placeholder', [
 
 Route::view('/laporan', 'pages.placeholder', [
     'title' => 'Laporan',
-    'description' => 'Halaman rekap uang masuk dan uang keluar dengan export PDF atau Excel.',
+    'description' => 'Halaman rekap credit dan debit dengan export PDF atau Excel.',
     'icon' => 'ti ti-file-report',
 ])->name('laporan.index');
 

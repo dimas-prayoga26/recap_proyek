@@ -51,6 +51,7 @@ class TransactionAllocationTest extends TestCase
 
         $response = $this->post(route('transactions.store'), [
             'type' => 'keluar',
+            'project_id' => $project->id,
             'project_area_id' => $area->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $mainWorkItem->id,
@@ -78,7 +79,7 @@ class TransactionAllocationTest extends TestCase
         $this->assertSame(433059840, $transaction->amount);
         $this->assertSame(428087040, PaymentTerm::query()->where('payment_group_id', $mainGroup->id)->value('amount'));
         $this->assertSame(4972800, PaymentTerm::query()->where('payment_group_id', $additionalGroup->id)->value('amount'));
-        $this->assertSame(8, $mainGroup->refresh()->fixed_total_terms);
+        $this->assertSame(1, $mainGroup->refresh()->total_terms);
         $this->assertSame(2, ProjectTransactionAllocation::query()->where('project_transaction_id', $transaction->id)->count());
         $this->assertDatabaseHas('project_transaction_allocations', [
             'project_transaction_id' => $transaction->id,
@@ -88,17 +89,17 @@ class TransactionAllocationTest extends TestCase
         ]);
     }
 
-    public function test_expense_transaction_keeps_fixed_total_terms_separate_from_paid_terms(): void
+    public function test_expense_transaction_ignores_submitted_total_terms_and_opens_next_unpaid_payment(): void
     {
         $project = Project::create([
-            'name' => 'Project Fixed Termin Test',
-            'slug' => 'project-fixed-termin-test-'.uniqid(),
+            'name' => 'Project Automatic Termin Test',
+            'slug' => 'project-automatic-termin-test-'.uniqid(),
             'status' => 'active',
         ]);
         $area = ProjectArea::create([
             'project_id' => $project->id,
             'code' => 'K9',
-            'name' => 'Project Fixed Termin Test - K9',
+            'name' => 'Project Automatic Termin Test - K9',
         ]);
         $vendor = Vendor::firstOrCreate(['name' => 'Build Dec Interior']);
         $category = TransactionCategory::firstOrCreate(
@@ -115,6 +116,7 @@ class TransactionAllocationTest extends TestCase
 
         $response = $this->post(route('transactions.store'), [
             'type' => 'keluar',
+            'project_id' => $project->id,
             'project_area_id' => $area->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $workItem->id,
@@ -130,57 +132,13 @@ class TransactionAllocationTest extends TestCase
 
         $paymentGroup = PaymentGroup::query()->where('work_item_id', $workItem->id)->firstOrFail();
 
-        $this->assertSame(8, $paymentGroup->fixed_total_terms);
-        $this->assertSame(8, $paymentGroup->total_terms);
+        $this->assertSame(3, $paymentGroup->total_terms);
         $this->assertSame(1, $paymentGroup->paid_terms);
+        $this->assertSame(3, ProjectTransaction::query()->latest('id')->value('payment_total'));
         $this->assertDatabaseHas('payment_terms', [
             'payment_group_id' => $paymentGroup->id,
             'payment_number' => 2,
             'amount' => 10000000,
-        ]);
-    }
-
-    public function test_expense_transaction_rejects_payment_number_above_fixed_total_terms(): void
-    {
-        $project = Project::create([
-            'name' => 'Project Invalid Termin Test',
-            'slug' => 'project-invalid-termin-test-'.uniqid(),
-            'status' => 'active',
-        ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Invalid Termin Test - K9',
-        ]);
-        $category = TransactionCategory::firstOrCreate(
-            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
-            ['status' => 'active'],
-        );
-        $workItem = WorkItem::create([
-            'project_id' => $project->id,
-            'project_area_id' => $area->id,
-            'name' => 'Pekerjaan Termin Tidak Valid',
-            'offer_rupiah' => 80000000,
-        ]);
-
-        $response = $this->from(route('uang-keluar.index'))->post(route('transactions.store'), [
-            'type' => 'keluar',
-            'project_area_id' => $area->id,
-            'transaction_category_id' => $category->id,
-            'work_item_id' => $workItem->id,
-            'amount' => 10000000,
-            'recorded_at' => '2026-08-28',
-            'payment_number' => 9,
-            'payment_total' => 8,
-            'receipt_total' => 80000000,
-        ]);
-
-        $response
-            ->assertRedirect(route('uang-keluar.index'))
-            ->assertSessionHasErrors('payment_number');
-
-        $this->assertDatabaseMissing('payment_groups', [
-            'work_item_id' => $workItem->id,
         ]);
     }
 }

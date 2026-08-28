@@ -18,7 +18,7 @@ class ProjectController extends Controller
     public function index(): View
     {
         return view('pages.project-form', [
-            'title' => 'Project',
+            'title' => 'Project Holding',
             'activeProject' => $this->activeProject(),
             'projects' => Project::query()
                 ->withCount(['workItems', 'areas'])
@@ -54,7 +54,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('project.index')
-            ->with('status', "Project \"{$project->name}\" berhasil dibuat dan dijadikan project aktif.");
+            ->with('status', "Project Holding \"{$project->name}\" berhasil dibuat dan dijadikan project aktif.");
     }
 
     private function uniqueSlug(string $name): string

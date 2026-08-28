@@ -61,8 +61,8 @@
               <i class="ti ti-folder-plus text-primary"></i>
             </div>
             <div>
-              <h4 class="mb-1">Tambah Project Baru</h4>
-              <p class="text-muted mb-0">Project baru otomatis jadi project aktif setelah disimpan.</p>
+              <h4 class="mb-1">Tambah Project Holding Baru</h4>
+              <p class="text-muted mb-0">Project holding baru otomatis jadi project holding aktif setelah disimpan.</p>
             </div>
           </div>
 
@@ -71,22 +71,22 @@
           @endif
 
           @if ($errors->any())
-            <div class="alert alert-danger">Data belum lengkap. Cek lagi nama project.</div>
+            <div class="alert alert-danger">Data belum lengkap. Cek lagi nama project holding.</div>
           @endif
 
           <form method="POST" action="{{ route('project.store') }}">
             @csrf
             <div class="mb-3">
-              <label for="project-name" class="form-label">Nama Project</label>
-              <input type="text" class="form-control @error('name') is-invalid @enderror" id="project-name" name="name" value="{{ old('name') }}" placeholder="Contoh: Project Menteng" required />
+              <label for="project-name" class="form-label">Nama Project Holding</label>
+              <input type="text" class="form-control @error('name') is-invalid @enderror" id="project-name" name="name" value="{{ old('name') }}" placeholder="Contoh: Project Holding Menteng" required />
               @error('name')
                 <div class="invalid-feedback">{{ $message }}</div>
               @enderror
-              <span class="form-helper">Area kerja default "Lainnya" akan otomatis dibuat untuk project ini.</span>
+              <span class="form-helper">Area kerja default "Lainnya" akan otomatis dibuat untuk project holding ini.</span>
             </div>
             <div class="mb-4">
-              <label for="project-description" class="form-label">Deskripsi (opsional)</label>
-              <textarea class="form-control" id="project-description" name="description" rows="3" placeholder="Catatan singkat tentang project ini">{{ old('description') }}</textarea>
+              <label for="project-description" class="form-label">Alamat</label>
+              <textarea class="form-control" id="project-description" name="description" rows="3" placeholder="Alamat project holding">{{ old('description') }}</textarea>
             </div>
             <button type="submit" class="btn btn-primary">
               <i class="ti ti-device-floppy me-1"></i> Simpan &amp; Jadikan Aktif
@@ -99,14 +99,14 @@
     <div class="col-xl-7">
       <div class="card">
         <div class="card-header">
-          <h4 class="mb-0">Daftar Project</h4>
+          <h4 class="mb-0">Daftar Project Holding</h4>
         </div>
         <div class="card-body pt-0">
           <div class="table-responsive">
             <table class="table table-hover project-list-table mb-0">
               <thead>
                 <tr>
-                  <th>Project</th>
+                  <th>Project Holding</th>
                   <th>Status</th>
                   <th class="text-end">Area</th>
                   <th class="text-end">Pekerjaan</th>
@@ -129,7 +129,7 @@
                     <td class="text-end">{{ $project->work_items_count }}</td>
                     <td class="text-end">
                       @if ($activeProject?->is($project))
-                        <span class="badge bg-light-primary text-primary">Project Aktif</span>
+                        <span class="badge bg-light-primary text-primary">Project Holding Aktif</span>
                       @else
                         <form method="POST" action="{{ route('dashboard.active-project') }}">
                           @csrf
@@ -141,7 +141,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="5" class="text-center text-muted py-4">Belum ada project.</td>
+                    <td colspan="5" class="text-center text-muted py-4">Belum ada project holding.</td>
                   </tr>
                 @endforelse
               </tbody>

@@ -15,7 +15,7 @@ class WorkPackageItemTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_regular_offer_stores_custom_fixed_total_terms_on_work_item_and_payment_group(): void
+    public function test_regular_offer_creates_work_item_and_offer_record(): void
     {
         $project = Project::create([
             'name' => 'Project Termin Plan Test',
@@ -37,22 +37,19 @@ class WorkPackageItemTest extends TestCase
             'pekerjaan' => 'Pekerjaan Rencana 6 Termin',
             'brand' => 'Vendor Rencana',
             'penawaran_rupiah' => 120000000,
-            'fixed_total_terms' => 6,
         ]);
 
-        $response->assertRedirect(route('kategori-pekerjaan.index'));
+        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']));
 
         $workItem = WorkItem::query()
             ->where('project_id', $project->id)
             ->where('name', 'Pekerjaan Rencana 6 Termin')
             ->firstOrFail();
 
-        $this->assertSame(6, $workItem->fixed_total_terms);
-        $this->assertDatabaseHas('payment_groups', [
+        $this->assertDatabaseHas('project_offers', [
             'project_id' => $project->id,
-            'work_item_id' => $workItem->id,
-            'fixed_total_terms' => 6,
-            'total_terms' => 6,
+            'pekerjaan' => 'Pekerjaan Rencana 6 Termin',
+            'penawaran_rupiah' => 120000000,
         ]);
     }
 
@@ -85,7 +82,7 @@ class WorkPackageItemTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('kategori-pekerjaan.index'));
+        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']));
 
         $workItem = WorkItem::query()
             ->where('project_id', $project->id)
@@ -96,15 +93,6 @@ class WorkPackageItemTest extends TestCase
             'project_id' => $project->id,
             'work_item_id' => $workItem->id,
             'pekerjaan' => 'Master Bedroom + Bathroom',
-        ]);
-        $this->assertNull($workItem->package_name);
-        $this->assertSame(8, $workItem->fixed_total_terms);
-        $this->assertDatabaseHas('payment_groups', [
-            'project_id' => $project->id,
-            'work_item_id' => $workItem->id,
-            'fixed_total_terms' => 8,
-            'total_terms' => 8,
-            'paid_terms' => 0,
         ]);
         $this->assertSame(3, WorkPackageItem::query()->where('work_item_id', $workItem->id)->count());
         $this->assertSame(
