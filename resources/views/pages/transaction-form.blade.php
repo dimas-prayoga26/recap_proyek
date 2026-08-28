@@ -314,6 +314,19 @@
       width: 82px;
     }
 
+    .receipt-preview-file {
+      align-items: center;
+      border-radius: 6px;
+      display: none;
+      height: 62px;
+      justify-content: center;
+      width: 82px;
+    }
+
+    .receipt-preview-file.is-visible {
+      display: flex;
+    }
+
     .draft-summary {
       position: sticky;
       top: 92px;
@@ -641,11 +654,12 @@
                 <span class="avtar avtar-lg bg-light-primary">
                   <i class="ti ti-photo-plus text-primary"></i>
                 </span>
-                <strong class="d-block">Upload / Capture JPEG</strong>
-                <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg" capture="environment" />
+                <strong class="d-block">Upload Bukti</strong>
+                <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.pdf" />
               </label>
               <div class="receipt-preview" id="receipt-preview">
                 <img alt="Preview bukti transaksi" id="receipt-image" />
+                <span class="receipt-preview-file bg-light-danger text-danger fw-semibold" id="receipt-file-badge">PDF</span>
                 <div>
                   <strong id="receipt-name">Belum ada file</strong>
                   <span class="form-helper mb-0" id="receipt-size">-</span>
@@ -736,6 +750,7 @@
       const receiptFileInput = document.querySelector('#receipt-file');
       const receiptPreview = document.querySelector('#receipt-preview');
       const receiptImage = document.querySelector('#receipt-image');
+      const receiptFileBadge = document.querySelector('#receipt-file-badge');
       const receiptName = document.querySelector('#receipt-name');
       const receiptSize = document.querySelector('#receipt-size');
       const draftStatus = document.querySelector('#draft-status');
@@ -1240,26 +1255,44 @@
 
         if (!file) {
           receiptPreview.classList.remove('is-visible');
+          receiptImage.removeAttribute('src');
+          receiptImage.style.display = '';
+          receiptFileBadge.classList.remove('is-visible');
           document.querySelector('#summary-receipt').textContent = 'Belum ada';
           return;
         }
 
-        if (!file.type.includes('jpeg') && !file.name.toLowerCase().endsWith('.jpg')) {
-          receiptName.textContent = 'Format harus JPEG';
-          receiptSize.textContent = 'Pilih file .jpg atau .jpeg';
+        const fileName = file.name.toLowerCase();
+        const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
+        const isAllowedImage = file.type.startsWith('image/') && /\.(jpe?g|png|webp)$/i.test(file.name);
+
+        if (!isPdf && !isAllowedImage) {
+          receiptName.textContent = 'Format harus gambar atau PDF';
+          receiptSize.textContent = 'Pilih JPG, PNG, WEBP, atau PDF';
           receiptPreview.classList.add('is-visible');
+          receiptImage.removeAttribute('src');
+          receiptImage.style.display = 'none';
+          receiptFileBadge.classList.remove('is-visible');
           document.querySelector('#summary-receipt').textContent = 'Format tidak sesuai';
           return;
         }
 
         receiptName.textContent = file.name;
-        receiptSize.textContent = 'Memproses resize...';
+        receiptSize.textContent = isPdf ? sizeLabel(file.size) : 'Memproses resize...';
         receiptPreview.classList.add('is-visible');
+
+        if (isPdf) {
+          receiptImage.removeAttribute('src');
+          receiptImage.style.display = 'none';
+          receiptFileBadge.classList.add('is-visible');
+          document.querySelector('#summary-receipt').textContent = 'PDF ' + sizeLabel(file.size);
+          return;
+        }
 
         const compressedBlob = await compressImage(file);
         const compressedFile = new File(
           [compressedBlob],
-          file.name.replace(/\.(jpg|jpeg)$/i, '') + '.jpg',
+          file.name.replace(/\.(jpg|jpeg|png|webp)$/i, '') + '.jpg',
           { type: 'image/jpeg', lastModified: Date.now() },
         );
 
@@ -1270,6 +1303,8 @@
         const previewUrl = URL.createObjectURL(compressedFile);
 
         receiptImage.src = previewUrl;
+        receiptImage.style.display = '';
+        receiptFileBadge.classList.remove('is-visible');
         receiptName.textContent = compressedFile.name;
         receiptSize.textContent = 'Asli ' + sizeLabel(file.size) + ' | Resize ' + sizeLabel(compressedFile.size);
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedFile.size);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\ProjectArea;
+use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -19,24 +20,42 @@ class PaymentTermController extends Controller
     {
         $filters = $request->validate([
             'area' => ['nullable', Rule::in(['K9', 'K8', 'C21', 'Lainnya'])],
+            'search' => ['nullable', 'string', 'max:255'],
+            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'terms' => ['nullable', 'integer', 'min:1', 'max:24'],
         ]);
-        $filters['area'] = $filters['area'] ?? 'K9';
 
         $activeProject = $this->activeProject();
         $areas = $activeProject
             ? ProjectArea::query()->whereBelongsTo($activeProject)->orderBy('name')->get()
             : collect();
-        $selectedArea = $areas->firstWhere('code', $filters['area']);
-
-        $workItems = WorkItem::query()
-            ->with(['paymentGroups.terms', 'projectArea', 'vendor'])
-            ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
-            ->when($selectedArea, fn ($query) => $query->whereBelongsTo($selectedArea, 'projectArea'))
+        $selectedArea = filled($filters['area'] ?? null) ? $areas->firstWhere('code', $filters['area']) : null;
+        $vendors = Vendor::query()
+            ->when($activeProject, fn ($query) => $query->whereHas('workItems', fn ($query) => $query->whereBelongsTo($activeProject)))
             ->orderBy('name')
             ->get();
 
-        $allRows = $this->paymentRows($workItems);
+        $workItems = WorkItem::query()
+            ->with(['paymentGroups.terms', 'vendor'])
+            ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
+            ->when($selectedArea, fn ($query) => $query->whereBelongsTo($selectedArea, 'projectArea'))
+            ->when(filled($filters['vendor_id'] ?? null), fn ($query) => $query->where('vendor_id', $filters['vendor_id']))
+            ->when(filled($filters['search'] ?? null), function ($query) use ($filters) {
+                $search = $filters['search'];
+
+                $query->where(function ($query) use ($search) {
+                    $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('brand', 'like', "%{$search}%")
+                        ->orWhereHas('vendor', fn ($query) => $query->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->orderBy('name')
+            ->get();
+
+        $allRows = $this->paymentRows($workItems)
+            ->sortBy(fn (array $row) => $row['vendor_name'].'|'.$row['work_item']->name)
+            ->values();
         $availableTermsOptions = $allRows
             ->pluck('summary.total_terms')
             ->unique()
@@ -54,9 +73,9 @@ class PaymentTermController extends Controller
         return view('pages.payment-terms', [
             'title' => 'Rekap Pembayaran',
             'activeProject' => $activeProject,
-            'areas' => $areas,
             'filters' => $filters,
             'rows' => $rows,
+            'vendors' => $vendors,
             'availableTermsOptions' => $availableTermsOptions,
             'maxTermsColumn' => $maxTermsColumn,
         ]);
@@ -70,6 +89,7 @@ class PaymentTermController extends Controller
 
             return [
                 'work_item' => $workItem,
+                'vendor_name' => $workItem->vendor?->name ?? '-',
                 'payment_group' => $paymentGroup,
                 'summary' => $summary,
                 'payments' => $paymentGroup

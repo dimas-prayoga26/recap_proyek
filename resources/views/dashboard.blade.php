@@ -71,6 +71,33 @@
       transform: translateY(-1px);
     }
 
+    .termin-position-summary {
+      align-items: center;
+      border-top: 1px solid rgba(255, 193, 7, 0.24);
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+
+    .termin-position-summary-item {
+      min-width: 0;
+    }
+
+    .termin-position-summary-item span {
+      color: #697586;
+      display: block;
+      font-size: 12px;
+    }
+
+    .termin-position-summary-item strong {
+      color: #202939;
+      display: block;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     .recent-transaction-card .card-header {
       border-bottom: 1px solid #eef2f6;
       padding-bottom: 18px;
@@ -284,8 +311,8 @@
                     <i class="ti ti-clock-dollar"></i>
                   </div>
                   <div class="ms-2">
-                    <h5 class="mb-0">Termin Berjalan</h5>
-                    <small class="text-muted">{{ $paymentGroup['code'] }}</small>
+                    <h5 class="mb-0">{{ $paymentGroup['work_item_name'] }}</h5>
+                    <small class="text-muted">{{ $paymentGroup['vendor_name'] }}</small>
                   </div>
                 </div>
                 <span class="badge bg-warning">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
@@ -293,9 +320,15 @@
               <div class="progress mb-2" style="height: 8px">
                 <div class="progress-bar bg-warning" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
               </div>
-              <div class="d-flex justify-content-between">
-                <small class="text-muted">Sudah dibayar {{ $paymentGroup['paid_amount'] }}</small>
-                <small class="text-muted">Sisa {{ $paymentGroup['remaining_amount'] }}</small>
+              <div class="termin-position-summary">
+                <div class="termin-position-summary-item">
+                  <span>Dibayar</span>
+                  <strong class="text-success">{{ $paymentGroup['paid_amount'] }}</strong>
+                </div>
+                <div class="termin-position-summary-item text-end">
+                  <span>Sisa</span>
+                  <strong class="text-primary">{{ $paymentGroup['remaining_amount'] }}</strong>
+                </div>
               </div>
             </a>
           @else
@@ -333,8 +366,7 @@
                 <tr>
                   <th>Tanggal</th>
                   <th>Nama Barang / Kegiatan</th>
-                  <th>Kategori</th>
-                  <th>Kelompok</th>
+                  <th>Vendor</th>
                   <th>Jenis</th>
                   <th class="text-end">Nominal</th>
                   <th>Bukti</th>
@@ -359,16 +391,11 @@
                         </div>
                         <div>
                           <strong>{{ $transaction['name'] }}</strong>
-                          <span>{{ $transaction['area'] }}</span>
+                          <span>{{ $transaction['project_name'] }}</span>
                         </div>
                       </div>
                     </td>
-                    <td>
-                      <span class="badge {{ $isIncomeTransaction ? 'bg-light-success text-success' : 'bg-light-primary text-primary' }}">
-                        {{ $transaction['category'] }}
-                      </span>
-                    </td>
-                    <td>{{ $transaction['group'] }}</td>
+                    <td>{{ $transaction['vendor'] }}</td>
                     <td>
                       <span class="badge {{ $isIncomeTransaction ? 'bg-light-success text-success' : 'bg-light-danger text-danger' }}">
                         {{ $isIncomeTransaction ? 'Credit' : 'Debit' }}
@@ -387,6 +414,7 @@
                           data-bs-toggle="modal"
                           data-bs-target="#receipt-preview-modal"
                           data-receipt-url="{{ $transaction['receipt_url'] }}"
+                          data-receipt-mime="{{ $transaction['receipt_mime'] }}"
                           data-receipt-title="{{ $transaction['name'] }}"
                         >
                           <i class="ti ti-photo"></i> Lihat
@@ -398,7 +426,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
+                    <td colspan="6" class="text-center text-muted py-4">
                       Belum ada transaksi untuk project aktif ini.
                     </td>
                   </tr>
@@ -420,6 +448,10 @@
         </div>
         <div class="modal-body text-center">
           <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
+          <iframe src="" id="receipt-preview-pdf" class="w-100 border rounded d-none" style="height: 70vh;" title="Bukti transaksi PDF"></iframe>
+          <a href="#" id="receipt-preview-download" class="btn btn-light-primary mt-3 d-none" target="_blank" rel="noopener">
+            Buka PDF
+          </a>
         </div>
       </div>
     </div>
@@ -444,11 +476,21 @@
       updateExportLinks();
 
       const receiptPreviewImage = document.querySelector('#receipt-preview-image');
+      const receiptPreviewPdf = document.querySelector('#receipt-preview-pdf');
+      const receiptPreviewDownload = document.querySelector('#receipt-preview-download');
       const receiptPreviewTitle = document.querySelector('#receipt-preview-title');
 
       document.querySelectorAll('.receipt-action').forEach(function (button) {
         button.addEventListener('click', function () {
-          receiptPreviewImage.src = button.dataset.receiptUrl;
+          const isPdf = button.dataset.receiptMime === 'application/pdf';
+
+          receiptPreviewImage.classList.toggle('d-none', isPdf);
+          receiptPreviewPdf.classList.toggle('d-none', !isPdf);
+          receiptPreviewDownload.classList.toggle('d-none', !isPdf);
+
+          receiptPreviewImage.src = isPdf ? '' : button.dataset.receiptUrl;
+          receiptPreviewPdf.src = isPdf ? button.dataset.receiptUrl : '';
+          receiptPreviewDownload.href = button.dataset.receiptUrl;
           receiptPreviewTitle.textContent = 'Bukti Transaksi - ' + (button.dataset.receiptTitle || '');
         });
       });

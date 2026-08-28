@@ -7,6 +7,7 @@ use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
 use App\Models\ProjectArea;
+use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
@@ -97,6 +98,31 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('Pembayaran 4')
             ->assertDontSee('Pembayaran 8')
             ->assertSee('Rp 0');
+    }
+
+    public function test_payment_recap_can_filter_by_search_and_vendor(): void
+    {
+        [$area, $firstWorkItem] = $this->workItemForActiveProject('Pasang Kanopi');
+        $firstVendor = Vendor::create(['name' => 'Vendor Kanopi']);
+        $secondVendor = Vendor::create(['name' => 'Vendor Lantai']);
+        $secondWorkItem = $this->workItemInArea($area, 'Pasang Lantai');
+
+        $firstWorkItem->update(['vendor_id' => $firstVendor->id]);
+        $secondWorkItem->update(['vendor_id' => $secondVendor->id]);
+        $this->paymentGroupFor($firstWorkItem, 8);
+        $this->paymentGroupFor($secondWorkItem, 8);
+
+        $response = $this->get(route('termin-pembayaran.index', [
+            'search' => 'Kanopi',
+            'vendor_id' => $firstVendor->id,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee('Vendor')
+            ->assertSee('Pasang Kanopi')
+            ->assertSee('Vendor Kanopi')
+            ->assertDontSee('Pasang Lantai');
     }
 
     /**

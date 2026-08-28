@@ -135,11 +135,20 @@ class DashboardController extends Controller
             return null;
         }
 
-        $paymentGroup = PaymentGroup::query()
-            ->with(['terms', 'workItem'])
+        $latestTransaction = ProjectTransaction::query()
+            ->with(['paymentGroup.terms', 'paymentGroup.workItem.vendor'])
             ->whereBelongsTo($project)
-            ->latest()
+            ->whereNotNull('payment_group_id')
+            ->latest('recorded_at')
+            ->latest('id')
             ->first();
+
+        $paymentGroup = $latestTransaction?->paymentGroup
+            ?? PaymentGroup::query()
+                ->with(['terms', 'workItem.vendor'])
+                ->whereBelongsTo($project)
+                ->latest()
+                ->first();
 
         if (! $paymentGroup) {
             return null;
@@ -151,15 +160,21 @@ class DashboardController extends Controller
         $remainingAmount = $totalAmount - $paidAmount;
         $highestPaymentNumber = (int) $paymentGroup->terms->max('payment_number');
         $totalTerms = $remainingAmount > 0 ? $highestPaymentNumber + 1 : max($highestPaymentNumber, 1);
+        $progress = $totalAmount > 0
+            ? min(100, max(0, (int) round(($paidAmount / $totalAmount) * 100)))
+            : 0;
 
         return [
             'code' => $paymentGroup->code,
             'work_item_id' => $paymentGroup->work_item_id,
+            'work_item_name' => $paymentGroup->workItem?->name ?? 'Belum ada pekerjaan',
+            'vendor_name' => $paymentGroup->workItem?->vendor?->name ?? '-',
             'paid_terms' => $paidTerms,
             'total_terms' => $totalTerms,
-            'progress' => (int) round(($paidTerms / $totalTerms) * 100),
-            'paid_amount' => $this->formatRupiahShort($paidAmount),
-            'remaining_amount' => $this->formatRupiahShort($remainingAmount),
+            'progress' => $progress,
+            'total_amount' => $this->formatRupiah($totalAmount),
+            'paid_amount' => $this->formatRupiah($paidAmount),
+            'remaining_amount' => $this->formatRupiah($remainingAmount),
         ];
     }
 
@@ -170,7 +185,7 @@ class DashboardController extends Controller
         }
 
         return ProjectTransaction::query()
-            ->with(['attachments', 'category', 'paymentGroup', 'projectArea', 'workItem'])
+            ->with(['attachments', 'vendor', 'workItem.vendor'])
             ->whereBelongsTo($project)
             ->latest('recorded_at')
             ->latest('id')
@@ -183,14 +198,12 @@ class DashboardController extends Controller
                     'date' => $transaction->recorded_at?->format('d/m/Y') ?? '-',
                     'day' => $this->dayName($transaction->recorded_at),
                     'name' => $transaction->workItem?->name ?? '-',
-                    'area' => $transaction->projectArea?->name ?? $project->name,
-                    'category' => $transaction->category?->name ?? '-',
-                    'group' => $transaction->paymentGroup
-                        ? $transaction->paymentGroup->code.' - '.($transaction->payment_number ?? 1).'/'.($transaction->payment_total ?? $transaction->paymentGroup->total_terms ?? 1)
-                        : '-',
+                    'project_name' => $project->name,
+                    'vendor' => $transaction->vendor?->name ?? $transaction->workItem?->vendor?->name ?? '-',
                     'type' => $transaction->type,
                     'amount' => $this->formatRupiah($transaction->amount),
                     'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : null,
+                    'receipt_mime' => $attachment?->mime_type,
                 ];
             });
     }
@@ -214,7 +227,9 @@ class DashboardController extends Controller
 
     private function formatRupiah(int $amount): string
     {
-        return 'Rp '.number_format($amount, 0, ',', '.');
+        $prefix = $amount < 0 ? '- ' : '';
+
+        return $prefix.'Rp '.number_format(abs($amount), 0, ',', '.');
     }
 
     private function formatRupiahShort(int $amount): string
