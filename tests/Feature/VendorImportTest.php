@@ -118,4 +118,56 @@ class VendorImportTest extends TestCase
             'brand' => 'Akmal Revisi',
         ]);
     }
+
+    public function test_vendor_can_be_deleted_and_related_vendor_references_are_cleared(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Vendor Delete',
+            'slug' => 'project-vendor-delete-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $area = ProjectArea::create([
+            'project_id' => $project->id,
+            'code' => 'K9',
+            'name' => 'Project Vendor Delete - K9',
+        ]);
+        $vendor = Vendor::create(['name' => 'Vendor Hapus Test']);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'project_area_id' => $area->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Vendor Hapus',
+            'brand' => 'Vendor Hapus Test',
+            'offer_rupiah' => 1000000,
+        ]);
+        ProjectOffer::create([
+            'project_id' => $project->id,
+            'project_area_id' => $area->id,
+            'vendor_id' => $vendor->id,
+            'work_item_id' => $workItem->id,
+            'project_name' => $project->name,
+            'area' => 'K9',
+            'pekerjaan' => 'Pekerjaan Vendor Hapus',
+            'brand' => 'Vendor Hapus Test',
+            'penawaran_rupiah' => 1000000,
+        ]);
+
+        $response = $this->delete(route('vendor.destroy', $vendor));
+
+        $response
+            ->assertRedirect(route('vendor.index'))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('vendors', ['id' => $vendor->id]);
+        $this->assertDatabaseHas('work_items', [
+            'id' => $workItem->id,
+            'vendor_id' => null,
+            'brand' => null,
+        ]);
+        $this->assertDatabaseHas('project_offers', [
+            'work_item_id' => $workItem->id,
+            'vendor_id' => null,
+            'brand' => null,
+        ]);
+    }
 }

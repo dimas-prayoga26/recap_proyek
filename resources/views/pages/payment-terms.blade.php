@@ -55,6 +55,38 @@
       text-align: right;
     }
 
+    .term-payment-button {
+      border: 0;
+      color: #202939;
+      font-weight: 700;
+      padding: 0;
+      text-decoration: none;
+    }
+
+    .term-payment-button:hover {
+      color: #2196f3;
+      text-decoration: underline;
+    }
+
+    .payment-detail-line {
+      align-items: flex-start;
+      border-bottom: 1px solid #eef2f6;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+      padding: 10px 0;
+    }
+
+    .payment-detail-line span {
+      color: #697586;
+      font-size: 12px;
+    }
+
+    .payment-detail-line strong {
+      color: #202939;
+      text-align: right;
+    }
+
     .vendor-search-dropdown {
       position: relative;
     }
@@ -184,9 +216,27 @@
                     <td>{{ $row['vendor_name'] }}</td>
                     <td class="term-amount-cell">{{ $formatRupiah($row['summary']['offer']) }}</td>
                     @for ($number = 1; $number <= $maxTermsColumn; $number++)
-                      <td class="term-amount-cell">
-                        @if ($row['payments']->has($number))
-                          {{ $formatRupiah($row['payments'][$number]->amount) }}
+                    <td class="term-amount-cell">
+                        @php($payment = $row['payments']->get($number))
+                        @if ($payment)
+                          <button
+                            type="button"
+                            class="term-payment-button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#payment-detail-modal"
+                            data-work-name="{{ $payment['detail']['work_name'] }}"
+                            data-vendor-name="{{ $payment['detail']['vendor_name'] }}"
+                            data-payment-number="{{ $payment['detail']['payment_number'] }}"
+                            data-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                            data-recorded-at="{{ $payment['detail']['recorded_at'] }}"
+                            data-type="{{ $payment['detail']['type'] }}"
+                            data-notes="{{ $payment['detail']['notes'] }}"
+                            data-receipt-url="{{ $payment['detail']['receipt_url'] }}"
+                            data-receipt-mime="{{ $payment['detail']['receipt_mime'] }}"
+                            data-receipt-name="{{ $payment['detail']['receipt_name'] }}"
+                          >
+                            {{ $formatRupiah($payment['amount']) }}
+                          </button>
                         @else
                           -
                         @endif
@@ -204,6 +254,55 @@
                 @endforelse
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="payment-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="payment-detail-title">Detail Pembayaran</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-4">
+            <div class="col-md-5">
+              <div class="payment-detail-line">
+                <span>Pekerjaan</span>
+                <strong id="payment-detail-work">-</strong>
+              </div>
+              <div class="payment-detail-line">
+                <span>Vendor</span>
+                <strong id="payment-detail-vendor">-</strong>
+              </div>
+              <div class="payment-detail-line">
+                <span>Jenis</span>
+                <strong id="payment-detail-type">-</strong>
+              </div>
+              <div class="payment-detail-line">
+                <span>Tanggal</span>
+                <strong id="payment-detail-date">-</strong>
+              </div>
+              <div class="payment-detail-line">
+                <span>Nominal</span>
+                <strong id="payment-detail-amount">-</strong>
+              </div>
+              <div class="payment-detail-line">
+                <span>Catatan</span>
+                <strong id="payment-detail-notes">-</strong>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <div id="payment-detail-empty" class="alert alert-light-secondary mb-0">Bukti belum ada.</div>
+              <img src="" id="payment-detail-image" class="img-fluid rounded d-none" alt="Bukti pembayaran" />
+              <iframe src="" id="payment-detail-pdf" class="w-100 border rounded d-none" style="height: 70vh;" title="Bukti pembayaran PDF"></iframe>
+              <a href="#" id="payment-detail-download" class="btn btn-light-primary mt-3 d-none" target="_blank" rel="noopener">
+                Buka PDF
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -254,6 +353,43 @@
       vendorSearch.addEventListener('input', filterVendorOptions);
       vendorToggle.addEventListener('shown.bs.dropdown', function () {
         vendorSearch.focus();
+      });
+
+      const paymentDetailTitle = document.querySelector('#payment-detail-title');
+      const paymentDetailWork = document.querySelector('#payment-detail-work');
+      const paymentDetailVendor = document.querySelector('#payment-detail-vendor');
+      const paymentDetailType = document.querySelector('#payment-detail-type');
+      const paymentDetailDate = document.querySelector('#payment-detail-date');
+      const paymentDetailAmount = document.querySelector('#payment-detail-amount');
+      const paymentDetailNotes = document.querySelector('#payment-detail-notes');
+      const paymentDetailEmpty = document.querySelector('#payment-detail-empty');
+      const paymentDetailImage = document.querySelector('#payment-detail-image');
+      const paymentDetailPdf = document.querySelector('#payment-detail-pdf');
+      const paymentDetailDownload = document.querySelector('#payment-detail-download');
+
+      document.querySelectorAll('.term-payment-button').forEach(function (button) {
+        button.addEventListener('click', function () {
+          const receiptUrl = button.dataset.receiptUrl || '';
+          const isPdf = button.dataset.receiptMime === 'application/pdf';
+
+          paymentDetailTitle.textContent = 'Pembayaran ke-' + (button.dataset.paymentNumber || '-');
+          paymentDetailWork.textContent = button.dataset.workName || '-';
+          paymentDetailVendor.textContent = button.dataset.vendorName || '-';
+          paymentDetailType.textContent = button.dataset.type || '-';
+          paymentDetailDate.textContent = button.dataset.recordedAt || '-';
+          paymentDetailAmount.textContent = button.dataset.amount || '-';
+          paymentDetailNotes.textContent = button.dataset.notes || '-';
+
+          paymentDetailEmpty.classList.toggle('d-none', receiptUrl !== '');
+          paymentDetailImage.classList.toggle('d-none', !receiptUrl || isPdf);
+          paymentDetailPdf.classList.toggle('d-none', !receiptUrl || !isPdf);
+          paymentDetailDownload.classList.toggle('d-none', !receiptUrl || !isPdf);
+
+          paymentDetailImage.src = receiptUrl && !isPdf ? receiptUrl : '';
+          paymentDetailPdf.src = receiptUrl && isPdf ? receiptUrl : '';
+          paymentDetailDownload.href = receiptUrl || '#';
+          paymentDetailDownload.textContent = button.dataset.receiptName ? 'Buka ' + button.dataset.receiptName : 'Buka PDF';
+        });
       });
     });
   </script>

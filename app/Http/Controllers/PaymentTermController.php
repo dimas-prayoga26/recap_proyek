@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
+use App\Models\PaymentTerm;
 use App\Models\ProjectArea;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -36,7 +38,7 @@ class PaymentTermController extends Controller
             ->get();
 
         $workItems = WorkItem::query()
-            ->with(['paymentGroups.terms', 'vendor'])
+            ->with(['paymentGroups.terms.allocations.transaction.attachments', 'vendor'])
             ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
             ->when($selectedArea, fn ($query) => $query->whereBelongsTo($selectedArea, 'projectArea'))
             ->when(filled($filters['vendor_id'] ?? null), fn ($query) => $query->where('vendor_id', $filters['vendor_id']))
@@ -93,10 +95,39 @@ class PaymentTermController extends Controller
                 'payment_group' => $paymentGroup,
                 'summary' => $summary,
                 'payments' => $paymentGroup
-                    ? $paymentGroup->terms->keyBy('payment_number')
+                    ? $paymentGroup->terms
+                        ->sortBy('payment_number')
+                        ->mapWithKeys(fn (PaymentTerm $term): array => [
+                            $term->payment_number => [
+                                'amount' => (int) $term->amount,
+                                'detail' => $this->paymentDetail($workItem, $term),
+                            ],
+                        ])
                     : collect(),
             ];
         });
+    }
+
+    private function paymentDetail(WorkItem $workItem, PaymentTerm $term): array
+    {
+        $allocation = $term->allocations
+            ->sortByDesc(fn ($allocation) => $allocation->transaction?->recorded_at?->timestamp ?? 0)
+            ->first();
+        $transaction = $allocation?->transaction;
+        $attachment = $transaction?->attachments->first();
+
+        return [
+            'work_name' => $workItem->name,
+            'vendor_name' => $workItem->vendor?->name ?? '-',
+            'payment_number' => $term->payment_number,
+            'amount' => (int) $term->amount,
+            'recorded_at' => $transaction?->recorded_at?->format('d/m/Y') ?? $term->paid_at?->format('d/m/Y') ?? '-',
+            'type' => $transaction?->type === 'keluar' ? 'Debit' : ($transaction?->type === 'masuk' ? 'Credit' : '-'),
+            'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
+            'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : '',
+            'receipt_mime' => $attachment?->mime_type ?? '',
+            'receipt_name' => $attachment?->original_name ?? '',
+        ];
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array

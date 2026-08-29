@@ -18,6 +18,7 @@ Route::put('/project/{project}', [ProjectController::class, 'update'])->name('pr
 Route::get('/vendor', [VendorController::class, 'index'])->name('vendor.index');
 Route::post('/vendor', [VendorController::class, 'store'])->name('vendor.store');
 Route::put('/vendor/{vendor}', [VendorController::class, 'update'])->name('vendor.update');
+Route::delete('/vendor/{vendor}', [VendorController::class, 'destroy'])->name('vendor.destroy');
 Route::post('/vendor/import', [VendorController::class, 'import'])->name('vendor.import');
 Route::get('/vendor/export', [VendorController::class, 'export'])->name('vendor.export');
 
@@ -25,6 +26,7 @@ Route::redirect('/penawaran', '/kategori-pekerjaan');
 Route::get('/kategori-pekerjaan', [ProjectOfferController::class, 'index'])->name('kategori-pekerjaan.index');
 Route::post('/kategori-pekerjaan', [ProjectOfferController::class, 'store'])->name('kategori-pekerjaan.store');
 Route::put('/kategori-pekerjaan/{projectOffer}', [ProjectOfferController::class, 'update'])->name('kategori-pekerjaan.update');
+Route::delete('/kategori-pekerjaan/{projectOffer}', [ProjectOfferController::class, 'destroy'])->name('kategori-pekerjaan.destroy');
 
 Route::view('/kategori', 'pages.placeholder', [
     'title' => 'Kategori Transaksi',

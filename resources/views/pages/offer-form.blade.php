@@ -322,7 +322,7 @@
               <div class="col-md-5" id="brand-field-wrapper">
                 <div class="mb-3">
                   <label for="vendor-search" class="form-label">Vendor</label>
-                  <div class="searchable-select js-searchable-select">
+                  <div class="searchable-select js-searchable-select" data-allow-empty="true">
                     <input type="text" class="form-control searchable-select-input @error('vendor_id') is-invalid @enderror" id="vendor-search" data-role="search-input" placeholder="Cari nama vendor..." autocomplete="off" />
                     <div class="searchable-select-menu" data-role="menu"></div>
                     <select class="form-select d-none" id="vendor-select" name="vendor_id" data-role="source">
@@ -550,21 +550,30 @@
                       <td class="text-end">{{ $offer->penawaran_rupiah ? 'Rp '.number_format($offer->penawaran_rupiah, 0, ',', '.') : '-' }}</td>
                       <td>{{ $offer->catatan ?: '-' }}</td>
                       <td class="text-end">
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-light-secondary offer-edit-btn"
-                          data-id="{{ $offer->id }}"
-                          data-project-id="{{ $offer->project_id }}"
-                          data-area="{{ $offer->area }}"
-                          data-pekerjaan="{{ $offer->pekerjaan }}"
-                          data-vendor-id="{{ $offer->vendor_id }}"
-                          data-usd="{{ $offer->penawaran_usd }}"
-                          data-rupiah="{{ $offer->penawaran_rupiah }}"
-                          data-catatan="{{ $offer->catatan }}"
-                          data-package-items="{{ $offer->workItem?->packageItems?->map(fn ($item) => ['name' => $item->name, 'brand' => $item->brand])->values()->toJson(JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?? '[]' }}"
-                        >
-                          <i class="ti ti-edit"></i> Edit
-                        </button>
+                        <div class="d-flex justify-content-end gap-2">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-light-secondary offer-edit-btn"
+                            data-id="{{ $offer->id }}"
+                            data-project-id="{{ $offer->project_id }}"
+                            data-area="{{ $offer->area }}"
+                            data-pekerjaan="{{ $offer->pekerjaan }}"
+                            data-vendor-id="{{ $offer->vendor_id }}"
+                            data-usd="{{ $offer->penawaran_usd }}"
+                            data-rupiah="{{ $offer->penawaran_rupiah }}"
+                            data-catatan="{{ $offer->catatan }}"
+                            data-package-items="{{ $offer->workItem?->packageItems?->map(fn ($item) => ['name' => $item->name, 'brand' => $item->brand])->values()->toJson(JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?? '[]' }}"
+                          >
+                            <i class="ti ti-edit"></i> Edit
+                          </button>
+                          <form method="POST" action="{{ route('kategori-pekerjaan.destroy', $offer) }}" onsubmit="return confirm('Hapus kategori pekerjaan ini?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-light-danger">
+                              <i class="ti ti-trash"></i> Delete
+                            </button>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   @endforeach
@@ -629,16 +638,17 @@
         const select = wrapper.querySelector('[data-role="source"]');
         const input = wrapper.querySelector('[data-role="search-input"]');
         const menu = wrapper.querySelector('[data-role="menu"]');
+        const allowEmpty = wrapper.dataset.allowEmpty === 'true';
 
         function options() {
           return Array.from(select.options).filter(function (option) {
-            return option.value !== '';
+            return allowEmpty || option.value !== '';
           });
         }
 
         function selectedLabel() {
           const option = select.options[select.selectedIndex];
-          return option && option.value !== '' ? option.textContent.trim() : '';
+          return option ? option.textContent.trim() : '';
         }
 
         function syncInputFromSelect() {

@@ -75,6 +75,33 @@ class VendorController extends Controller
             ->with('status', "Vendor \"{$vendor->name}\" berhasil diperbarui.");
     }
 
+    public function destroy(Vendor $vendor): RedirectResponse
+    {
+        $vendorName = $vendor->name;
+
+        DB::transaction(function () use ($vendor): void {
+            $vendor->workItems()->update([
+                'vendor_id' => null,
+                'brand' => null,
+            ]);
+            $vendor->offers()->update([
+                'vendor_id' => null,
+                'brand' => null,
+            ]);
+            $vendor->packageItems()->update([
+                'vendor_id' => null,
+                'brand' => null,
+            ]);
+            $vendor->transactions()->update(['vendor_id' => null]);
+
+            $vendor->delete();
+        });
+
+        return redirect()
+            ->route('vendor.index')
+            ->with('status', "Vendor \"{$vendorName}\" berhasil dihapus.");
+    }
+
     public function import(Request $request): RedirectResponse
     {
         $validated = $request->validate([

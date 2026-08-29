@@ -148,17 +148,26 @@
                     <td class="text-end">{{ $vendor->work_items_count }}</td>
                     <td class="text-end">{{ $vendor->offers_count }}</td>
                     <td class="text-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-light-secondary vendor-edit-btn"
-                        data-id="{{ $vendor->id }}"
-                        data-name="{{ $vendor->name }}"
-                        data-contact-name="{{ $vendor->contact_name }}"
-                        data-phone="{{ $vendor->phone }}"
-                        data-notes="{{ $vendor->notes }}"
-                      >
-                        <i class="ti ti-edit me-1"></i> Edit
-                      </button>
+                      <div class="d-flex justify-content-end gap-2">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-light-secondary vendor-edit-btn"
+                          data-id="{{ $vendor->id }}"
+                          data-name="{{ $vendor->name }}"
+                          data-contact-name="{{ $vendor->contact_name }}"
+                          data-phone="{{ $vendor->phone }}"
+                          data-notes="{{ $vendor->notes }}"
+                        >
+                          <i class="ti ti-edit me-1"></i> Edit
+                        </button>
+                        <form method="POST" action="{{ route('vendor.destroy', $vendor) }}" onsubmit="return confirm('Hapus vendor ini? Referensi vendor di data terkait akan dikosongkan.');">
+                          @csrf
+                          @method('DELETE')
+                          <button type="submit" class="btn btn-sm btn-light-danger">
+                            <i class="ti ti-trash me-1"></i> Delete
+                          </button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 @empty

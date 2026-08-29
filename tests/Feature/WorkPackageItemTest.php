@@ -101,4 +101,42 @@ class WorkPackageItemTest extends TestCase
         );
         $this->assertSame(1, ProjectOffer::query()->where('work_item_id', $workItem->id)->count());
     }
+
+    public function test_category_offer_can_be_deleted_when_it_has_no_payment_history(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Delete Kategori',
+            'slug' => 'project-delete-kategori-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $area = ProjectArea::create([
+            'project_id' => $project->id,
+            'code' => 'K9',
+            'name' => 'Project Delete Kategori - K9',
+        ]);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'project_area_id' => $area->id,
+            'name' => 'Kategori Bisa Dihapus',
+            'offer_rupiah' => 5000000,
+        ]);
+        $offer = ProjectOffer::create([
+            'project_id' => $project->id,
+            'project_area_id' => $area->id,
+            'work_item_id' => $workItem->id,
+            'project_name' => $project->name,
+            'area' => 'K9',
+            'pekerjaan' => 'Kategori Bisa Dihapus',
+            'penawaran_rupiah' => 5000000,
+        ]);
+
+        $response = $this->delete(route('kategori-pekerjaan.destroy', $offer));
+
+        $response
+            ->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('project_offers', ['id' => $offer->id]);
+        $this->assertDatabaseMissing('work_items', ['id' => $workItem->id]);
+    }
 }

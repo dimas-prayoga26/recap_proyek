@@ -175,7 +175,7 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get();
         $workItems = WorkItem::query()
-            ->with(['packageItems.vendor', 'paymentGroups.terms', 'projectArea', 'vendor'])
+            ->with(['packageItems.vendor', 'paymentGroups.terms', 'project', 'projectArea', 'vendor'])
             ->whereHas('project', fn ($query) => $query->where('status', 'active'))
             ->orderBy('package_name')
             ->orderBy('name')

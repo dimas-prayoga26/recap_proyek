@@ -1,19 +1,22 @@
 @php
   $isIncome = ($mode ?? 'masuk') === 'masuk';
   $transactionType = $isIncome ? 'masuk' : 'keluar';
-  $selectedWorkItem = old('work_item_id')
+  $requestedWorkItem = old('work_item_id')
     ? ($workItems ?? collect())->firstWhere('id', (int) old('work_item_id'))
     : (request()->query('work_item_id')
       ? ($workItems ?? collect())->firstWhere('id', (int) request()->query('work_item_id'))
-      : ($workItems ?? collect())->first());
+      : null);
+  $selectedProject = old('project_id')
+    ? ($projects ?? collect())->firstWhere('id', (int) old('project_id'))
+    : ($requestedWorkItem?->project ?? $activeProject ?? ($projects ?? collect())->first());
+  $defaultWorkItem = ($workItems ?? collect())->first(fn ($item) => (int) $item->project_id === (int) $selectedProject?->id)
+    ?? ($workItems ?? collect())->first();
+  $selectedWorkItem = $requestedWorkItem ?? $defaultWorkItem;
   $selectedProjectArea = old('project_area_id')
     ? ($projectAreas ?? collect())->firstWhere('id', (int) old('project_area_id'))
     : ($selectedWorkItem?->project_area_id
       ? ($projectAreas ?? collect())->firstWhere('id', $selectedWorkItem->project_area_id)
-      : ($projectAreas ?? collect())->first());
-  $selectedProject = old('project_id')
-    ? ($projects ?? collect())->firstWhere('id', (int) old('project_id'))
-    : ($selectedProjectArea?->project ?? $activeProject);
+      : ($projectAreas ?? collect())->first(fn ($area) => (int) $area->project_id === (int) $selectedProject?->id));
   $selectedVendor = old('vendor_id')
     ? ($vendors ?? collect())->firstWhere('id', (int) old('vendor_id'))
     : $selectedWorkItem?->vendor;
@@ -429,7 +432,7 @@
                   <select class="form-select @error('project_id') is-invalid @enderror" id="project-holding" name="project_id" required>
                     @forelse (($projects ?? collect()) as $project)
                       <option value="{{ $project->id }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>
-                        {{ $project->name }}
+                        {{ $project->name }}{{ $activeProject?->id === $project->id ? ' - Active' : '' }}
                       </option>
                     @empty
                       <option value="">Project holding belum tersedia</option>

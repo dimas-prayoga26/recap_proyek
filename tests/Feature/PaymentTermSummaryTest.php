@@ -7,6 +7,9 @@ use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
 use App\Models\ProjectArea;
+use App\Models\ProjectTransaction;
+use App\Models\ProjectTransactionAllocation;
+use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -123,6 +126,60 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('Pasang Kanopi')
             ->assertSee('Vendor Kanopi')
             ->assertDontSee('Pasang Lantai');
+    }
+
+    public function test_paid_payment_cell_contains_modal_transaction_and_receipt_details(): void
+    {
+        [$area, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
+        $vendor = Vendor::create(['name' => 'Vendor Bukti']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $workItem->update(['vendor_id' => $vendor->id]);
+        $paymentGroup = $this->paymentGroupFor($workItem, 1, payments: [1 => 2500000]);
+        $paymentTerm = $paymentGroup->terms()->firstOrFail();
+        $transaction = ProjectTransaction::create([
+            'project_id' => $area->project_id,
+            'project_area_id' => $area->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'payment_group_id' => $paymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 2500000,
+            'recorded_at' => '2026-08-29',
+            'payment_number' => 1,
+            'payment_total' => 1,
+            'receipt_total' => 80000000,
+            'notes' => 'Catatan bukti pembayaran',
+        ]);
+        $transaction->attachments()->create([
+            'disk' => 'public',
+            'path' => 'transaction-receipts/kwitansi-test.pdf',
+            'original_name' => 'kwitansi-test.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 12000,
+        ]);
+        ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'payment_term_id' => $paymentTerm->id,
+            'amount' => 2500000,
+            'payment_number' => 1,
+            'role' => 'primary',
+            'notes' => 'Allocation note',
+        ]);
+
+        $response = $this->get(route('termin-pembayaran.index', ['area' => $area->code]));
+
+        $response
+            ->assertOk()
+            ->assertSee('term-payment-button', false)
+            ->assertSee('data-work-name="Pekerjaan Dengan Bukti"', false)
+            ->assertSee('data-vendor-name="Vendor Bukti"', false)
+            ->assertSee('kwitansi-test.pdf');
     }
 
     /**

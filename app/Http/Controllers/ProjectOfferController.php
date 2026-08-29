@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\Project;
 use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
+use App\Models\ProjectTransactionAllocation;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use App\Models\WorkPackageItem;
@@ -278,6 +279,50 @@ class ProjectOfferController extends Controller
         return redirect()
             ->route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => $validated['area']])
             ->with('status', 'Kategori pekerjaan berhasil diperbarui.');
+    }
+
+    public function destroy(ProjectOffer $projectOffer): RedirectResponse
+    {
+        $projectId = $projectOffer->project_id;
+        $area = $projectOffer->area;
+        $workItem = $projectOffer->workItem;
+
+        if ($workItem && $this->workItemHasPaymentHistory($workItem)) {
+            return back()
+                ->withErrors(['delete' => 'Kategori pekerjaan tidak bisa dihapus karena sudah punya transaksi atau rekap pembayaran.']);
+        }
+
+        DB::transaction(function () use ($projectOffer, $workItem): void {
+            $projectOffer->delete();
+
+            if (! $workItem) {
+                return;
+            }
+
+            $hasOtherOffer = ProjectOffer::query()
+                ->where('work_item_id', $workItem->id)
+                ->exists();
+
+            if (! $hasOtherOffer) {
+                $workItem->paymentGroups()->delete();
+                $workItem->packageItems()->delete();
+                $workItem->delete();
+            }
+        });
+
+        return redirect()
+            ->route('kategori-pekerjaan.index', array_filter([
+                'project_id' => $projectId,
+                'area' => $area,
+            ]))
+            ->with('status', 'Kategori pekerjaan berhasil dihapus.');
+    }
+
+    private function workItemHasPaymentHistory(WorkItem $workItem): bool
+    {
+        return $workItem->transactions()->exists()
+            || $workItem->paymentGroups()->whereHas('terms')->exists()
+            || ProjectTransactionAllocation::query()->where('work_item_id', $workItem->id)->exists();
     }
 
     /**
