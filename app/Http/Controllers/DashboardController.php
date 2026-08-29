@@ -55,12 +55,19 @@ class DashboardController extends Controller
                 'required',
                 Rule::exists('projects', 'id')->where('status', 'active'),
             ],
+            'redirect_to' => ['nullable', 'string', 'max:2048'],
         ]);
 
         ActiveProjectSelection::updateOrCreate(
             ['key' => 'dashboard'],
             ['project_id' => $validated['project_id']],
         );
+
+        $redirectTo = $validated['redirect_to'] ?? null;
+
+        if ($redirectTo && str_starts_with($redirectTo, '/')) {
+            return redirect()->to($redirectTo);
+        }
 
         return redirect()->route('dashboard');
     }

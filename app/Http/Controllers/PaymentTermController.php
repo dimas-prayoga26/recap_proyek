@@ -5,13 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
-use App\Models\ProjectArea;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PaymentTermController extends Controller
@@ -21,17 +19,12 @@ class PaymentTermController extends Controller
     public function index(Request $request): View
     {
         $filters = $request->validate([
-            'area' => ['nullable', Rule::in(['K9', 'K8', 'C21', 'Lainnya'])],
             'search' => ['nullable', 'string', 'max:255'],
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'terms' => ['nullable', 'integer', 'min:1', 'max:24'],
         ]);
 
         $activeProject = $this->activeProject();
-        $areas = $activeProject
-            ? ProjectArea::query()->whereBelongsTo($activeProject)->orderBy('name')->get()
-            : collect();
-        $selectedArea = filled($filters['area'] ?? null) ? $areas->firstWhere('code', $filters['area']) : null;
         $vendors = Vendor::query()
             ->when($activeProject, fn ($query) => $query->whereHas('workItems', fn ($query) => $query->whereBelongsTo($activeProject)))
             ->orderBy('name')
@@ -40,7 +33,6 @@ class PaymentTermController extends Controller
         $workItems = WorkItem::query()
             ->with(['paymentGroups.terms.allocations.transaction.attachments', 'vendor'])
             ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
-            ->when($selectedArea, fn ($query) => $query->whereBelongsTo($selectedArea, 'projectArea'))
             ->when(filled($filters['vendor_id'] ?? null), fn ($query) => $query->where('vendor_id', $filters['vendor_id']))
             ->when(filled($filters['search'] ?? null), function ($query) use ($filters) {
                 $search = $filters['search'];

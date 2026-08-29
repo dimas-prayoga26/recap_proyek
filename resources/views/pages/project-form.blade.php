@@ -83,7 +83,7 @@
               @error('name')
                 <div class="invalid-feedback">{{ $message }}</div>
               @enderror
-              <span class="form-helper">Area kerja default "Lainnya" akan otomatis dibuat untuk project holding ini.</span>
+              <span class="form-helper">Nama ini akan dipakai sebagai project holding aktif saat input transaksi.</span>
             </div>
             <div class="mb-4">
               <label for="project-description" class="form-label">Alamat</label>

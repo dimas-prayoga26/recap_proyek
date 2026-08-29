@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use App\Models\Vendor;
 use App\Models\WorkItem;
@@ -57,11 +56,14 @@ class BackfillK9WorkPackages extends Command
             return self::FAILURE;
         }
 
-        $project = Project::query()->where('slug', 'project-kemang')->firstOrFail();
-        $area = ProjectArea::query()
-            ->where('project_id', $project->id)
-            ->where('code', 'K9')
-            ->firstOrFail();
+        $project = Project::firstOrCreate(
+            ['slug' => 'project-kemang-k9'],
+            [
+                'name' => 'Project Kemang K9',
+                'status' => 'active',
+                'description' => 'Project holding hasil impor sheet K9.',
+            ],
+        );
         $packages = $this->packagesFromMergedRanges($sheet['rows'], $sheet['merge_ranges']);
         $created = 0;
         $updated = 0;
@@ -69,14 +71,14 @@ class BackfillK9WorkPackages extends Command
         $terms = 0;
         $removedLegacyPackages = 0;
 
-        DB::transaction(function () use ($project, $area, $packages, &$created, &$updated, &$packageItems, &$terms, &$removedLegacyPackages): void {
-            $removedLegacyPackages = $this->deleteLegacySectionPackages($project, $area);
+        DB::transaction(function () use ($project, $packages, &$created, &$updated, &$packageItems, &$terms, &$removedLegacyPackages): void {
+            $removedLegacyPackages = $this->deleteLegacySectionPackages($project);
 
             foreach ($packages as $package) {
-                $workItem = $this->packageWorkItem($project, $area, $package);
+                $workItem = $this->packageWorkItem($project, $package);
                 $wasRecentlyCreated = $workItem->wasRecentlyCreated;
 
-                $this->syncOffer($project, $area, $workItem, $package);
+                $this->syncOffer($project, $workItem, $package);
                 $this->syncPackageItems($workItem, $package['items']);
                 $terms += $this->syncPaymentTerms($workItem, $package);
                 $packageItems += count($package['items']);
@@ -315,12 +317,11 @@ class BackfillK9WorkPackages extends Command
         return $items;
     }
 
-    private function deleteLegacySectionPackages(Project $project, ProjectArea $area): int
+    private function deleteLegacySectionPackages(Project $project): int
     {
         $workItems = WorkItem::query()
             ->with('paymentGroups')
             ->where('project_id', $project->id)
-            ->where('project_area_id', $area->id)
             ->where('notes', 'like', 'Import paket dari sheet K9 baris %')
             ->whereDoesntHave('transactions')
             ->get();
@@ -341,23 +342,21 @@ class BackfillK9WorkPackages extends Command
     /**
      * @param  array{name: string, package_name: string|null, start_row: int, end_row: int, brand: string|null, rupiah: int|null, usd: float|null, payments: array<int, int>, items: array<int, array{name: string, brand: string|null}>}  $package
      */
-    private function packageWorkItem(Project $project, ProjectArea $area, array $package): WorkItem
+    private function packageWorkItem(Project $project, array $package): WorkItem
     {
         $vendor = filled($package['brand']) ? Vendor::firstOrCreate(['name' => $package['brand']]) : null;
         $workItem = WorkItem::query()
             ->where('project_id', $project->id)
-            ->where('project_area_id', $area->id)
             ->where('notes', $this->signature($package))
             ->first();
 
         if (! $workItem) {
-            $workItem = $this->findExistingPackageByItems($project, $area, $package);
+            $workItem = $this->findExistingPackageByItems($project, $package);
         }
 
         if (! $workItem) {
             $workItem = WorkItem::query()
                 ->where('project_id', $project->id)
-                ->where('project_area_id', $area->id)
                 ->where('name', $package['name'])
                 ->whereDoesntHave('transactions')
                 ->oldest('id')
@@ -367,7 +366,6 @@ class BackfillK9WorkPackages extends Command
         if (! $workItem) {
             $workItem = new WorkItem([
                 'project_id' => $project->id,
-                'project_area_id' => $area->id,
             ]);
         }
 
@@ -388,12 +386,11 @@ class BackfillK9WorkPackages extends Command
     /**
      * @param  array{name: string, rupiah: int|null, items: array<int, array{name: string, brand: string|null}>}  $package
      */
-    private function findExistingPackageByItems(Project $project, ProjectArea $area, array $package): ?WorkItem
+    private function findExistingPackageByItems(Project $project, array $package): ?WorkItem
     {
         $query = WorkItem::query()
             ->with('packageItems')
             ->where('project_id', $project->id)
-            ->where('project_area_id', $area->id)
             ->whereHas('packageItems')
             ->whereDoesntHave('transactions');
 
@@ -412,16 +409,14 @@ class BackfillK9WorkPackages extends Command
     /**
      * @param  array{name: string, package_name: string|null, brand: string|null, rupiah: int|null, usd: float|null}  $package
      */
-    private function syncOffer(Project $project, ProjectArea $area, WorkItem $workItem, array $package): void
+    private function syncOffer(Project $project, WorkItem $workItem, array $package): void
     {
         ProjectOffer::updateOrCreate(
             ['work_item_id' => $workItem->id],
             [
                 'project_id' => $project->id,
-                'project_area_id' => $area->id,
                 'vendor_id' => $workItem->vendor_id,
                 'project_name' => $project->name,
-                'area' => $area->code,
                 'pekerjaan' => $package['name'],
                 'brand' => $package['brand'],
                 'penawaran_usd' => $package['usd'],
@@ -535,7 +530,6 @@ class BackfillK9WorkPackages extends Command
         $vendor = filled($overflow['brand']) ? Vendor::firstOrCreate(['name' => $overflow['brand']]) : null;
         $targetWorkItem = WorkItem::query()
             ->where('project_id', $workItem->project_id)
-            ->where('project_area_id', $workItem->project_area_id)
             ->where('name', $overflow['name'])
             ->oldest('id')
             ->first();
@@ -543,7 +537,6 @@ class BackfillK9WorkPackages extends Command
         if (! $targetWorkItem) {
             $targetWorkItem = WorkItem::create([
                 'project_id' => $workItem->project_id,
-                'project_area_id' => $workItem->project_area_id,
                 'vendor_id' => $vendor?->id,
                 'name' => $overflow['name'],
                 'brand' => $overflow['brand'],

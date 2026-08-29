@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use App\Models\ProjectTransactionAllocation;
 use App\Models\Vendor;
@@ -25,7 +24,6 @@ class ProjectOfferController extends Controller
     {
         $filters = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
-            'area' => ['nullable', 'string', 'max:20'],
             'brand' => ['nullable', 'string', 'max:255'],
             'currency' => ['nullable', Rule::in(['usd', 'idr'])],
             'search' => ['nullable', 'string', 'max:255'],
@@ -33,7 +31,6 @@ class ProjectOfferController extends Controller
 
         $projects = Project::query()
             ->where('status', 'active')
-            ->with('areas')
             ->orderBy('name')
             ->get();
         $activeProject = $this->activeProject();
@@ -41,21 +38,11 @@ class ProjectOfferController extends Controller
             ? $projects->firstWhere('id', (int) $filters['project_id'])
             : ($activeProject ?? $projects->first());
 
-        $areas = $project
-            ? ProjectArea::query()
-                ->where('project_id', $project->id)
-                ->orderByRaw("FIELD(code, 'K9', 'K8', 'C21', 'Lainnya') = 0")
-                ->orderByRaw("FIELD(code, 'K9', 'K8', 'C21', 'Lainnya')")
-                ->orderBy('code')
-                ->get()
-            : collect();
         $filters['project_id'] = $project?->id;
-        $filters['area'] = $filters['area'] ?? ($areas->firstWhere('code', 'K9')?->code ?? $areas->first()?->code ?? 'K9');
 
         $offers = ProjectOffer::query()
             ->with(['vendor', 'workItem.packageItems.vendor'])
             ->when($project, fn ($query) => $query->where('project_id', $project->id))
-            ->where('area', $filters['area'])
             ->when($filters['brand'] ?? null, fn ($query, string $brand) => $query->where('brand', $brand))
             ->when($filters['currency'] ?? null, function ($query, string $currency) {
                 $column = $currency === 'usd' ? 'penawaran_usd' : 'penawaran_rupiah';
@@ -78,7 +65,6 @@ class ProjectOfferController extends Controller
                         });
                 });
             })
-            ->orderByRaw("FIELD(area, 'K9', 'K8', 'C21', 'Lainnya')")
             ->latest()
             ->paginate(12)
             ->withQueryString();
@@ -86,13 +72,12 @@ class ProjectOfferController extends Controller
         return view('pages.offer-form', [
             'title' => 'Kategori Pekerjaan',
             'activeProject' => $project,
+            'trueActiveProjectId' => $activeProject?->id,
             'projects' => $projects,
             'offers' => $offers,
-            'areas' => $areas,
             'vendors' => Vendor::query()->orderBy('name')->get(),
             'brands' => ProjectOffer::query()
                 ->when($project, fn ($query) => $query->where('project_id', $project->id))
-                ->where('area', $filters['area'])
                 ->whereNotNull('brand')
                 ->where('brand', '!=', '')
                 ->distinct()
@@ -101,7 +86,6 @@ class ProjectOfferController extends Controller
             'filters' => $filters,
             'totalOffers' => ProjectOffer::query()
                 ->when($project, fn ($query) => $query->where('project_id', $project->id))
-                ->where('area', $filters['area'])
                 ->count(),
         ]);
     }
@@ -110,7 +94,6 @@ class ProjectOfferController extends Controller
     {
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
-            'area' => ['required', 'string', 'max:20', Rule::notIn(['__new__'])],
             'pekerjaan' => ['required', 'string', 'max:255'],
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
@@ -140,10 +123,6 @@ class ProjectOfferController extends Controller
                 ->with('status', 'Belum ada project aktif. Silakan buat atau pilih project terlebih dahulu.');
         }
 
-        $projectArea = ProjectArea::firstOrCreate(
-            ['project_id' => $project->id, 'code' => $validated['area']],
-            ['name' => $project->name.' - '.$validated['area']],
-        );
         $vendor = filled($validated['vendor_id'] ?? null)
             ? Vendor::query()->find($validated['vendor_id'])
             : null;
@@ -151,10 +130,9 @@ class ProjectOfferController extends Controller
         $vendor ??= filled($fallbackBrand) ? Vendor::firstOrCreate(['name' => $fallbackBrand]) : null;
         $primaryBrand = $vendor?->name;
 
-        DB::transaction(function () use ($validated, $project, $projectArea, $vendor, $primaryBrand, $packageItems, $isPackage): void {
+        DB::transaction(function () use ($validated, $project, $vendor, $primaryBrand, $packageItems, $isPackage): void {
             $workItemAttributes = [
                 'project_id' => $project->id,
-                'project_area_id' => $projectArea->id,
                 'vendor_id' => $vendor?->id,
                 'name' => $validated['pekerjaan'],
                 'brand' => $primaryBrand,
@@ -167,7 +145,6 @@ class ProjectOfferController extends Controller
                 : WorkItem::updateOrCreate(
                     [
                         'project_id' => $project->id,
-                        'project_area_id' => $projectArea->id,
                         'name' => $validated['pekerjaan'],
                     ],
                     [
@@ -182,14 +159,12 @@ class ProjectOfferController extends Controller
             $this->syncPackageItems($workItem, $isPackage ? $packageItems : collect());
 
             ProjectOffer::create([
-                'area' => $validated['area'],
                 'pekerjaan' => $validated['pekerjaan'],
                 'brand' => $primaryBrand,
                 'penawaran_usd' => $validated['penawaran_usd'] ?? null,
                 'penawaran_rupiah' => $validated['penawaran_rupiah'] ?? null,
                 'catatan' => $validated['catatan'] ?? null,
                 'project_id' => $project->id,
-                'project_area_id' => $projectArea->id,
                 'vendor_id' => $vendor?->id,
                 'work_item_id' => $workItem->id,
                 'project_name' => $project->name,
@@ -197,7 +172,7 @@ class ProjectOfferController extends Controller
         });
 
         return redirect()
-            ->route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => $validated['area']])
+            ->route('kategori-pekerjaan.index', ['project_id' => $project->id])
             ->with('status', 'Kategori pekerjaan berhasil disimpan.');
     }
 
@@ -205,7 +180,6 @@ class ProjectOfferController extends Controller
     {
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
-            'area' => ['required', 'string', 'max:20', Rule::notIn(['__new__'])],
             'pekerjaan' => ['required', 'string', 'max:255'],
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
@@ -235,10 +209,6 @@ class ProjectOfferController extends Controller
                 ->with('status', 'Belum ada project aktif. Silakan buat atau pilih project terlebih dahulu.');
         }
 
-        $projectArea = ProjectArea::firstOrCreate(
-            ['project_id' => $project->id, 'code' => $validated['area']],
-            ['name' => $project->name.' - '.$validated['area']],
-        );
         $vendor = filled($validated['vendor_id'] ?? null)
             ? Vendor::query()->find($validated['vendor_id'])
             : null;
@@ -246,11 +216,10 @@ class ProjectOfferController extends Controller
         $vendor ??= filled($fallbackBrand) ? Vendor::firstOrCreate(['name' => $fallbackBrand]) : null;
         $primaryBrand = $vendor?->name;
 
-        DB::transaction(function () use ($projectOffer, $validated, $project, $projectArea, $vendor, $primaryBrand, $packageItems, $isPackage): void {
+        DB::transaction(function () use ($projectOffer, $validated, $project, $vendor, $primaryBrand, $packageItems, $isPackage): void {
             if ($projectOffer->workItem) {
                 $projectOffer->workItem->update([
                     'project_id' => $project->id,
-                    'project_area_id' => $projectArea->id,
                     'vendor_id' => $vendor?->id,
                     'name' => $validated['pekerjaan'],
                     'brand' => $primaryBrand,
@@ -263,28 +232,25 @@ class ProjectOfferController extends Controller
             }
 
             $projectOffer->update([
-                'area' => $validated['area'],
                 'pekerjaan' => $validated['pekerjaan'],
                 'brand' => $primaryBrand,
                 'penawaran_usd' => $validated['penawaran_usd'] ?? null,
                 'penawaran_rupiah' => $validated['penawaran_rupiah'] ?? null,
                 'catatan' => $validated['catatan'] ?? null,
                 'project_id' => $project->id,
-                'project_area_id' => $projectArea->id,
                 'vendor_id' => $vendor?->id,
                 'project_name' => $project->name,
             ]);
         });
 
         return redirect()
-            ->route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => $validated['area']])
+            ->route('kategori-pekerjaan.index', ['project_id' => $project->id])
             ->with('status', 'Kategori pekerjaan berhasil diperbarui.');
     }
 
     public function destroy(ProjectOffer $projectOffer): RedirectResponse
     {
         $projectId = $projectOffer->project_id;
-        $area = $projectOffer->area;
         $workItem = $projectOffer->workItem;
 
         if ($workItem && $this->workItemHasPaymentHistory($workItem)) {
@@ -313,7 +279,6 @@ class ProjectOfferController extends Controller
         return redirect()
             ->route('kategori-pekerjaan.index', array_filter([
                 'project_id' => $projectId,
-                'area' => $area,
             ]))
             ->with('status', 'Kategori pekerjaan berhasil dihapus.');
     }

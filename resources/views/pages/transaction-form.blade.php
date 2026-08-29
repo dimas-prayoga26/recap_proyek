@@ -12,11 +12,6 @@
   $defaultWorkItem = ($workItems ?? collect())->first(fn ($item) => (int) $item->project_id === (int) $selectedProject?->id)
     ?? ($workItems ?? collect())->first();
   $selectedWorkItem = $requestedWorkItem ?? $defaultWorkItem;
-  $selectedProjectArea = old('project_area_id')
-    ? ($projectAreas ?? collect())->firstWhere('id', (int) old('project_area_id'))
-    : ($selectedWorkItem?->project_area_id
-      ? ($projectAreas ?? collect())->firstWhere('id', $selectedWorkItem->project_area_id)
-      : ($projectAreas ?? collect())->first(fn ($area) => (int) $area->project_id === (int) $selectedProject?->id));
   $selectedVendor = old('vendor_id')
     ? ($vendors ?? collect())->firstWhere('id', (int) old('vendor_id'))
     : $selectedWorkItem?->vendor;
@@ -273,6 +268,19 @@
       color: #2196f3;
     }
 
+    .searchable-select-badge {
+      background: #e3f9e5;
+      border-radius: 999px;
+      color: #1a9c47;
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+
     .searchable-select-empty {
       color: #697586;
       font-size: 13px;
@@ -428,37 +436,48 @@
             <div class="row">
               <div class="col-md-12">
                 <div class="mb-3">
-                  <label for="project-holding" class="form-label">Project Holding</label>
-                  <select class="form-select @error('project_id') is-invalid @enderror" id="project-holding" name="project_id" required>
-                    @forelse (($projects ?? collect()) as $project)
-                      <option value="{{ $project->id }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>
-                        {{ $project->name }}{{ $activeProject?->id === $project->id ? ' - Active' : '' }}
-                      </option>
-                    @empty
-                      <option value="">Project holding belum tersedia</option>
-                    @endforelse
-                  </select>
+                  <label for="project-holding-search" class="form-label">Project Holding</label>
+                  <div class="searchable-select js-searchable-select">
+                    <input type="text" class="form-control searchable-select-input @error('project_id') is-invalid @enderror" id="project-holding-search" data-role="search-input" placeholder="Cari project holding..." autocomplete="off" />
+                    <div class="searchable-select-menu" data-role="menu"></div>
+                    <select class="form-select d-none" id="project-holding" name="project_id" data-role="source" required>
+                      @forelse (($projects ?? collect()) as $project)
+                        <option value="{{ $project->id }}" data-active="{{ $activeProject?->id === $project->id ? '1' : '0' }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>
+                          {{ $project->name }}
+                        </option>
+                      @empty
+                        <option value="">Project holding belum tersedia</option>
+                      @endforelse
+                    </select>
+                  </div>
                   @error('project_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
                 </div>
               </div>
-              <div class="col-md-6 d-none">
-                <div class="mb-3">
-                  <label for="main-category" class="form-label">Area / Kode</label>
-                  <select class="form-select @error('project_area_id') is-invalid @enderror" id="main-category" name="project_area_id" required>
-                    @forelse (($projectAreas ?? collect()) as $area)
-                      <option value="{{ $area->id }}" data-project-id="{{ $area->project_id }}" @selected((int) old('project_area_id', $selectedProjectArea?->id) === $area->id)>
-                        {{ $area->code }}
-                      </option>
-                    @empty
-                      <option value="">Area belum tersedia</option>
-                    @endforelse
-                  </select>
-                  @error('project_area_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                  @enderror
-                  <span class="form-helper">K9/K8/C21 adalah area yang berada di bawah Project Holding.</span>
+            </div>
+
+            <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <form method="POST" action="{{ route('dashboard.active-project') }}">
+                    @csrf
+                    <input type="hidden" name="project_id" id="project-activate-id" value="" />
+                    <input type="hidden" name="redirect_to" value="{{ $isIncome ? route('uang-masuk.index', [], false) : route('uang-keluar.index', [], false) }}" />
+                    <div class="modal-header">
+                      <h5 class="modal-title">Jadikan Project Aktif?</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                      <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-check me-1"></i> Ya, Aktifkan
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             </div>
@@ -467,7 +486,7 @@
               <div class="col-md-6">
                 <div class="mb-3">
                   <label for="activity-name" class="form-label">Nama Barang / Nama Kegiatan</label>
-                  <div class="searchable-select js-searchable-select" data-filter-select="#main-category" data-filter-attr="areaId">
+                  <div class="searchable-select js-searchable-select" data-filter-select="#project-holding" data-filter-attr="projectId">
                     <input type="text" class="form-control searchable-select-input @error('work_item_id') is-invalid @enderror" data-role="search-input" placeholder="Cari nama barang / kegiatan..." autocomplete="off" />
                     <div class="searchable-select-menu" data-role="menu"></div>
                     <select class="form-select d-none" id="activity-name" name="work_item_id" data-role="source">
@@ -476,7 +495,6 @@
                           value="{{ $item->id }}"
                           data-vendor-id="{{ $item->vendor_id }}"
                           data-project-id="{{ $item->project_id }}"
-                          data-area-id="{{ $item->project_area_id }}"
                           data-package-name="{{ $item->package_name }}"
                           data-package-label="{{ trim(($item->package_name ? 'Kategori: '.$item->package_name.' | ' : '').$item->packageItems->pluck('name')->join(', ')) }}"
                           data-search="{{ $item->name.' '.$item->package_name.' '.$item->brand.' '.$item->packageItems->pluck('name')->join(' ') }}"
@@ -703,10 +721,6 @@
             <strong id="summary-project-holding">{{ $selectedProject?->name ?? 'Belum tersedia' }}</strong>
           </div>
           <div class="summary-line">
-            <span>Area / Kode</span>
-            <strong id="summary-project-area">{{ $selectedProjectArea?->code ?? 'Belum tersedia' }}</strong>
-          </div>
-          <div class="summary-line">
             <span>Nama</span>
             <strong id="summary-name">{{ $selectedWorkItem?->name ?? 'Belum tersedia' }}</strong>
           </div>
@@ -742,7 +756,6 @@
       const form = document.querySelector('#transaction-form');
       const dateInput = document.querySelector('#record-date');
       const projectHoldingInput = document.querySelector('#project-holding');
-      const projectInput = document.querySelector('#main-category');
       const activityInput = document.querySelector('#activity-name');
       const vendorInput = document.querySelector('#vendor-name');
       const amountInput = document.querySelector('#amount');
@@ -818,6 +831,13 @@
             label.textContent = option.textContent.trim();
             item.appendChild(label);
 
+            if (option.dataset.active === '1') {
+              const badge = document.createElement('span');
+              badge.className = 'searchable-select-badge';
+              badge.textContent = 'Aktif';
+              item.appendChild(badge);
+            }
+
             if (option.dataset.packageLabel) {
               const helper = document.createElement('small');
               helper.textContent = option.dataset.packageLabel;
@@ -886,6 +906,47 @@
         return entry.sync;
       });
 
+      const projectActivateModalEl = document.querySelector('#project-activate-modal');
+
+      if (projectActivateModalEl) {
+        const projectActivateModal = new bootstrap.Modal(projectActivateModalEl);
+        const projectActivateIdInput = document.querySelector('#project-activate-id');
+        const projectActivateNameEl = document.querySelector('#project-activate-name');
+        const projectHoldingEntry = searchableSelects.find(function (entry) {
+          return entry.wrapper.contains(projectHoldingInput);
+        });
+        const activeProjectId = '{{ $activeProject?->id }}';
+        let lastConfirmedProjectId = projectHoldingInput.value;
+        let projectActivateConfirmed = false;
+
+        projectHoldingInput.addEventListener('change', function () {
+          if (!activeProjectId || projectHoldingInput.value === activeProjectId) {
+            lastConfirmedProjectId = projectHoldingInput.value;
+            return;
+          }
+
+          const option = projectHoldingInput.selectedOptions[0];
+          projectActivateIdInput.value = projectHoldingInput.value;
+          projectActivateNameEl.textContent = option ? option.textContent.trim() : '';
+          projectActivateConfirmed = false;
+          projectActivateModal.show();
+        });
+
+        projectActivateModalEl.querySelector('form').addEventListener('submit', function () {
+          projectActivateConfirmed = true;
+        });
+
+        projectActivateModalEl.addEventListener('hidden.bs.modal', function () {
+          if (!projectActivateConfirmed) {
+            projectHoldingInput.value = lastConfirmedProjectId;
+
+            if (projectHoldingEntry) {
+              projectHoldingEntry.sync();
+            }
+          }
+        });
+      }
+
       const allocationRows = document.querySelector('#allocation-rows');
       const allocationAddRow = document.querySelector('#allocation-add-row');
       const allocationSummary = document.querySelector('#allocation-summary');
@@ -936,7 +997,7 @@
         row.innerHTML =
           '<div class="col-md-5">'
           + '<label class="form-label">Pekerjaan</label>'
-          + '<div class="searchable-select js-searchable-select" data-filter-select="#main-category" data-filter-attr="areaId">'
+          + '<div class="searchable-select js-searchable-select" data-filter-select="#project-holding" data-filter-attr="projectId">'
           + '<input type="text" class="form-control searchable-select-input" data-role="search-input" placeholder="Cari pekerjaan..." autocomplete="off" />'
           + '<div class="searchable-select-menu" data-role="menu"></div>'
           + '<select class="form-select d-none" name="allocations[' + index + '][work_item_id]" data-role="source"></select>'
@@ -1073,8 +1134,8 @@
         paymentNumberInput.value = desiredValue;
       }
 
-      function parsePackageAreas(notes) {
-        const match = /^Paket gabungan \d+ area \(harga satu paket, bukan per-area\):\s*(.+?)\.\s*(?:Kontraktor:.*?\.\s*)?Total penawaran/.exec(notes || '');
+      function parsePackageItems(notes) {
+        const match = /^Paket gabungan \d+ (?:area|pekerjaan) \(harga satu paket, bukan per-pekerjaan\):\s*(.+?)\.\s*(?:Kontraktor:.*?\.\s*)?Total penawaran/.exec(notes || '');
 
         if (!match) {
           return null;
@@ -1122,17 +1183,17 @@
           receiptTotalInput.value = info.offer || '';
           paymentTotalInput.value = Number(info.total_terms || 1);
 
-          const packageAreas = (info.package_items || []).length > 0
+          const packageItems = (info.package_items || []).length > 0
             ? info.package_items.map(function (item) {
                 return item.brand ? item.name + ' - ' + item.brand : item.name;
               })
-            : parsePackageAreas(info.notes);
+            : parsePackageItems(info.notes);
 
-          if (packageAreas) {
+          if (packageItems) {
             terminPackageList.innerHTML = '';
-            packageAreas.forEach(function (area) {
+            packageItems.forEach(function (packageItem) {
               const item = document.createElement('li');
-              item.textContent = area;
+              item.textContent = packageItem;
               terminPackageList.appendChild(item);
             });
             terminPackage.classList.remove('d-none');
@@ -1188,7 +1249,6 @@
         const paymentLabel = receiptLabel + ' - ' + (paymentNumberInput.value || 1) + '/' + (paymentTotalInput.value || 1);
 
         document.querySelector('#summary-project-holding').textContent = selectedText(projectHoldingInput) || 'Belum tersedia';
-        document.querySelector('#summary-project-area').textContent = selectedText(projectInput) || 'Belum tersedia';
         document.querySelector('#summary-name').textContent = selectedText(activityInput) || 'Belum tersedia';
         document.querySelector('#summary-vendor').textContent = selectedText(vendorInput) || '-';
         document.querySelector('#summary-amount').textContent = formatCurrency(amountInput.value);
@@ -1313,30 +1373,7 @@
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedFile.size);
       }
 
-      function refreshAreasForProjectHolding() {
-        const projectId = projectHoldingInput.value;
-        const areaOptions = Array.from(projectInput.options).filter(function (option) {
-          return option.value !== '';
-        });
-        const matchingOptions = areaOptions.filter(function (option) {
-          return option.dataset.projectId === projectId;
-        });
-
-        areaOptions.forEach(function (option) {
-          const isVisible = option.dataset.projectId === projectId;
-          option.hidden = !isVisible;
-          option.disabled = !isVisible;
-        });
-
-        if (!projectInput.value || !projectInput.selectedOptions[0] || projectInput.selectedOptions[0].dataset.projectId !== projectId) {
-          projectInput.value = matchingOptions[0] ? matchingOptions[0].value : '';
-          projectInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        updateSummary();
-      }
-
-      [dateInput, projectHoldingInput, projectInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
+      [dateInput, projectHoldingInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
         input.addEventListener('input', function () {
           updateSummary();
         });
@@ -1347,7 +1384,15 @@
       });
 
       activityInput.addEventListener('change', syncVendorFromWorkItem);
-      projectHoldingInput.addEventListener('change', refreshAreasForProjectHolding);
+      projectHoldingInput.addEventListener('change', function () {
+        searchableSelects.forEach(function (entry) {
+          if (entry.wrapper.dataset.filterSelect) {
+            entry.refreshForFilter();
+          }
+        });
+
+        updateSummary();
+      });
       receiptFileInput.addEventListener('change', handleReceiptFile);
 
       paymentTotalInput.addEventListener('input', function () {
@@ -1397,7 +1442,6 @@
       });
 
       updateTerminInfo();
-      refreshAreasForProjectHolding();
     });
   </script>
 @endpush

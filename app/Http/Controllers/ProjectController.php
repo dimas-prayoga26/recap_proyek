@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\ActiveProjectSelection;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\WorkItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -49,12 +47,6 @@ class ProjectController extends Controller
             'description' => $validated['description'] ?? null,
         ]);
 
-        ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'Lainnya',
-            'name' => $project->name.' - Lainnya',
-        ]);
-
         ActiveProjectSelection::updateOrCreate(
             ['key' => 'dashboard'],
             ['project_id' => $project->id],
@@ -72,24 +64,13 @@ class ProjectController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        DB::transaction(function () use ($project, $validated): void {
-            $oldName = $project->name;
+        $project->update([
+            'name' => $validated['name'],
+            'slug' => $this->uniqueSlug($validated['name'], $project->id),
+            'description' => $validated['description'] ?? null,
+        ]);
 
-            $project->update([
-                'name' => $validated['name'],
-                'slug' => $this->uniqueSlug($validated['name'], $project->id),
-                'description' => $validated['description'] ?? null,
-            ]);
-
-            $project->offers()->update(['project_name' => $project->name]);
-
-            $project->areas()
-                ->where('name', 'like', $oldName.' - %')
-                ->get()
-                ->each(function (ProjectArea $area) use ($project): void {
-                    $area->update(['name' => $project->name.' - '.$area->code]);
-                });
-        });
+        $project->offers()->update(['project_name' => $project->name]);
 
         return redirect()
             ->route('project.index')

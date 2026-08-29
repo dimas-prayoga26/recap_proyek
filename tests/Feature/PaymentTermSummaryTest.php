@@ -6,7 +6,6 @@ use App\Models\ActiveProjectSelection;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectTransaction;
 use App\Models\ProjectTransactionAllocation;
 use App\Models\TransactionCategory;
@@ -21,11 +20,10 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_unpaid_work_item_ignores_stale_total_terms_and_shows_first_payment_column(): void
     {
-        [$area, $workItem] = $this->workItemForActiveProject('Pekerjaan Belum Dibayar');
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Belum Dibayar');
         $this->paymentGroupFor($workItem, 8);
 
         $response = $this->get(route('termin-pembayaran.index', [
-            'area' => $area->code,
             'terms' => 1,
         ]));
 
@@ -41,15 +39,15 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_default_view_uses_largest_automatic_payment_count_across_mixed_work_items(): void
     {
-        [$area, $unpaidWorkItem] = $this->workItemForActiveProject('Pekerjaan Termin 1');
-        $partialWorkItem = $this->workItemInArea($area, 'Pekerjaan Termin 2');
-        $paidOffWorkItem = $this->workItemInArea($area, 'Pekerjaan Termin 3');
+        [$project, $unpaidWorkItem] = $this->workItemForActiveProject('Pekerjaan Termin 1');
+        $partialWorkItem = $this->workItemInProject($project, 'Pekerjaan Termin 2');
+        $paidOffWorkItem = $this->workItemInProject($project, 'Pekerjaan Termin 3');
 
         $this->paymentGroupFor($unpaidWorkItem, 8);
         $this->paymentGroupFor($partialWorkItem, 8, payments: [1 => 30000000]);
         $this->paymentGroupFor($paidOffWorkItem, 8, payments: [1 => 30000000, 2 => 30000000, 3 => 20000000]);
 
-        $response = $this->get(route('termin-pembayaran.index', ['area' => $area->code]));
+        $response = $this->get(route('termin-pembayaran.index'));
 
         $response
             ->assertOk()
@@ -65,14 +63,13 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_terms_filter_limits_rows_and_columns_to_selected_automatic_payment_count(): void
     {
-        [$area, $oneTermWorkItem] = $this->workItemForActiveProject('Pekerjaan Hanya Termin 1');
-        $twoTermWorkItem = $this->workItemInArea($area, 'Pekerjaan Hanya Termin 2');
+        [$project, $oneTermWorkItem] = $this->workItemForActiveProject('Pekerjaan Hanya Termin 1');
+        $twoTermWorkItem = $this->workItemInProject($project, 'Pekerjaan Hanya Termin 2');
 
         $this->paymentGroupFor($oneTermWorkItem, 8);
         $this->paymentGroupFor($twoTermWorkItem, 8, payments: [1 => 30000000]);
 
         $response = $this->get(route('termin-pembayaran.index', [
-            'area' => $area->code,
             'terms' => 2,
         ]));
 
@@ -86,11 +83,10 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_paid_off_work_item_stops_at_highest_paid_payment_column(): void
     {
-        [$area, $workItem] = $this->workItemForActiveProject('Pekerjaan Lunas Termin 3');
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Lunas Termin 3');
         $this->paymentGroupFor($workItem, 8, payments: [1 => 30000000, 2 => 30000000, 3 => 20000000]);
 
         $response = $this->get(route('termin-pembayaran.index', [
-            'area' => $area->code,
             'terms' => 3,
         ]));
 
@@ -105,10 +101,10 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_payment_recap_can_filter_by_search_and_vendor(): void
     {
-        [$area, $firstWorkItem] = $this->workItemForActiveProject('Pasang Kanopi');
+        [$project, $firstWorkItem] = $this->workItemForActiveProject('Pasang Kanopi');
         $firstVendor = Vendor::create(['name' => 'Vendor Kanopi']);
         $secondVendor = Vendor::create(['name' => 'Vendor Lantai']);
-        $secondWorkItem = $this->workItemInArea($area, 'Pasang Lantai');
+        $secondWorkItem = $this->workItemInProject($project, 'Pasang Lantai');
 
         $firstWorkItem->update(['vendor_id' => $firstVendor->id]);
         $secondWorkItem->update(['vendor_id' => $secondVendor->id]);
@@ -130,7 +126,7 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_paid_payment_cell_contains_modal_transaction_and_receipt_details(): void
     {
-        [$area, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
         $vendor = Vendor::create(['name' => 'Vendor Bukti']);
         $category = TransactionCategory::firstOrCreate(
             ['name' => 'Jasa Tukang', 'type' => 'keluar'],
@@ -140,8 +136,7 @@ class PaymentTermSummaryTest extends TestCase
         $paymentGroup = $this->paymentGroupFor($workItem, 1, payments: [1 => 2500000]);
         $paymentTerm = $paymentGroup->terms()->firstOrFail();
         $transaction = ProjectTransaction::create([
-            'project_id' => $area->project_id,
-            'project_area_id' => $area->id,
+            'project_id' => $project->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $workItem->id,
             'vendor_id' => $vendor->id,
@@ -172,7 +167,7 @@ class PaymentTermSummaryTest extends TestCase
             'notes' => 'Allocation note',
         ]);
 
-        $response = $this->get(route('termin-pembayaran.index', ['area' => $area->code]));
+        $response = $this->get(route('termin-pembayaran.index'));
 
         $response
             ->assertOk()
@@ -183,7 +178,7 @@ class PaymentTermSummaryTest extends TestCase
     }
 
     /**
-     * @return array{ProjectArea, WorkItem}
+     * @return array{Project, WorkItem}
      */
     private function workItemForActiveProject(string $workItemName): array
     {
@@ -196,26 +191,19 @@ class PaymentTermSummaryTest extends TestCase
             ['key' => 'dashboard'],
             ['project_id' => $project->id],
         );
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => $project->name.' - K9',
-        ]);
         $workItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'name' => $workItemName,
             'offer_rupiah' => 80000000,
         ]);
 
-        return [$area, $workItem];
+        return [$project, $workItem];
     }
 
-    private function workItemInArea(ProjectArea $area, string $workItemName): WorkItem
+    private function workItemInProject(Project $project, string $workItemName): WorkItem
     {
         return WorkItem::create([
-            'project_id' => $area->project_id,
-            'project_area_id' => $area->id,
+            'project_id' => $project->id,
             'name' => $workItemName,
             'offer_rupiah' => 80000000,
         ]);

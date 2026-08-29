@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use App\Models\Vendor;
 use App\Models\WorkItem;
@@ -13,6 +12,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use ZipArchive;
 
 #[Signature('kemang:import-work-items {path=template/Laporan Keuangan Proyek Kemang Update.xlsx}')]
@@ -45,19 +45,10 @@ class ImportKemangWorkItems extends Command
             return self::FAILURE;
         }
 
-        $project = Project::firstOrCreate(
-            ['slug' => 'project-kemang'],
-            [
-                'name' => 'Project Kemang',
-                'status' => 'active',
-                'description' => 'Project utama untuk pencatatan keuangan Kemang.',
-            ],
-        );
-
-        $areaDefinitions = [
-            'K9' => 'Project Kemang - K9',
-            'K8' => 'Project Kemang - K8',
-            'C21' => 'Project Kemang - C21',
+        $projectDefinitions = [
+            'K9' => 'Project Kemang K9',
+            'K8' => 'Project Kemang K8',
+            'C21' => 'Project Kemang C21',
         ];
 
         $created = 0;
@@ -69,11 +60,15 @@ class ImportKemangWorkItems extends Command
         $termsSkippedUsdOnly = 0;
         $importedAt = now()->toDateString();
 
-        DB::transaction(function () use ($path, $project, $areaDefinitions, $importedAt, &$created, &$skippedExisting, &$skippedHeaderRows, &$offersCreated, &$offersSkippedExisting, &$termsImported, &$termsSkippedUsdOnly): void {
-            foreach ($areaDefinitions as $code => $areaName) {
-                $area = ProjectArea::firstOrCreate(
-                    ['project_id' => $project->id, 'code' => $code],
-                    ['name' => $areaName],
+        DB::transaction(function () use ($path, $projectDefinitions, $importedAt, &$created, &$skippedExisting, &$skippedHeaderRows, &$offersCreated, &$offersSkippedExisting, &$termsImported, &$termsSkippedUsdOnly): void {
+            foreach ($projectDefinitions as $code => $projectName) {
+                $project = Project::firstOrCreate(
+                    ['slug' => Str::slug($projectName)],
+                    [
+                        'name' => $projectName,
+                        'status' => 'active',
+                        'description' => 'Project holding hasil impor sheet '.$code.'.',
+                    ],
                 );
 
                 $rows = $this->readSheetRows($path, $code);
@@ -153,7 +148,6 @@ class ImportKemangWorkItems extends Command
                     } else {
                         WorkItem::create([
                             'project_id' => $project->id,
-                            'project_area_id' => $area->id,
                             'vendor_id' => $vendorId,
                             'name' => $name,
                             'brand' => $brand !== '' ? $brand : null,
@@ -176,7 +170,7 @@ class ImportKemangWorkItems extends Command
                     }
 
                     $offerExists = ProjectOffer::query()
-                        ->where('project_area_id', $area->id)
+                        ->where('project_id', $project->id)
                         ->where('pekerjaan', $originalName)
                         ->where(function ($query) use ($brand): void {
                             $brand !== '' ? $query->where('brand', $brand) : $query->whereNull('brand');
@@ -197,10 +191,8 @@ class ImportKemangWorkItems extends Command
 
                     ProjectOffer::create([
                         'project_id' => $project->id,
-                        'project_area_id' => $area->id,
                         'vendor_id' => $vendorId,
                         'project_name' => $project->name,
-                        'area' => $code,
                         'pekerjaan' => $originalName,
                         'brand' => $brand !== '' ? $brand : null,
                         'penawaran_usd' => $usd,

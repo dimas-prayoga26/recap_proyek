@@ -10,7 +10,6 @@ class WorkItem extends Model
 {
     protected $fillable = [
         'project_id',
-        'project_area_id',
         'vendor_id',
         'name',
         'package_name',
@@ -31,11 +30,6 @@ class WorkItem extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
-    }
-
-    public function projectArea(): BelongsTo
-    {
-        return $this->belongsTo(ProjectArea::class);
     }
 
     public function vendor(): BelongsTo

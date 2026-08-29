@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\ActiveProjectSelection;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use App\Models\WorkItem;
 use App\Models\WorkPackageItem;
@@ -22,24 +21,17 @@ class WorkPackageItemTest extends TestCase
             'slug' => 'project-termin-plan-test-'.uniqid(),
             'status' => 'active',
         ]);
-        ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Termin Plan Test - K9',
-        ]);
         ActiveProjectSelection::updateOrCreate(
             ['key' => 'dashboard'],
             ['project_id' => $project->id],
         );
 
         $response = $this->post(route('kategori-pekerjaan.store'), [
-            'area' => 'K9',
             'pekerjaan' => 'Pekerjaan Rencana 6 Termin',
-            'brand' => 'Vendor Rencana',
             'penawaran_rupiah' => 120000000,
         ]);
 
-        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']));
+        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id]));
 
         $workItem = WorkItem::query()
             ->where('project_id', $project->id)
@@ -60,18 +52,12 @@ class WorkPackageItemTest extends TestCase
             'slug' => 'project-paket-test-'.uniqid(),
             'status' => 'active',
         ]);
-        ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Paket Test - K9',
-        ]);
         ActiveProjectSelection::updateOrCreate(
             ['key' => 'dashboard'],
             ['project_id' => $project->id],
         );
 
         $response = $this->post(route('kategori-pekerjaan.store'), [
-            'area' => 'K9',
             'is_package' => '1',
             'pekerjaan' => 'Master Bedroom + Bathroom',
             'penawaran_rupiah' => 900000000,
@@ -82,7 +68,7 @@ class WorkPackageItemTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']));
+        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id]));
 
         $workItem = WorkItem::query()
             ->where('project_id', $project->id)
@@ -109,23 +95,16 @@ class WorkPackageItemTest extends TestCase
             'slug' => 'project-delete-kategori-'.uniqid(),
             'status' => 'active',
         ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Delete Kategori - K9',
-        ]);
         $workItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'name' => 'Kategori Bisa Dihapus',
             'offer_rupiah' => 5000000,
         ]);
         $offer = ProjectOffer::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'work_item_id' => $workItem->id,
             'project_name' => $project->name,
-            'area' => 'K9',
+            'area' => '',
             'pekerjaan' => 'Kategori Bisa Dihapus',
             'penawaran_rupiah' => 5000000,
         ]);
@@ -133,7 +112,7 @@ class WorkPackageItemTest extends TestCase
         $response = $this->delete(route('kategori-pekerjaan.destroy', $offer));
 
         $response
-            ->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id, 'area' => 'K9']))
+            ->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id]))
             ->assertSessionHas('status');
 
         $this->assertDatabaseMissing('project_offers', ['id' => $offer->id]);

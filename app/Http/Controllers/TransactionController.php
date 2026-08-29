@@ -6,7 +6,6 @@ use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectTransaction;
 use App\Models\ProjectTransactionAllocation;
 use App\Models\TransactionCategory;
@@ -39,7 +38,6 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'type' => ['required', Rule::in(['masuk', 'keluar'])],
             'project_id' => ['required', 'exists:projects,id'],
-            'project_area_id' => ['required', 'exists:project_areas,id'],
             'transaction_category_id' => ['nullable', 'exists:transaction_categories,id'],
             'work_item_id' => ['required', 'exists:work_items,id'],
             'vendor_id' => ['nullable', 'exists:vendors,id'],
@@ -58,18 +56,12 @@ class TransactionController extends Controller
             'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
         ]);
 
-        $projectArea = ProjectArea::query()->findOrFail($validated['project_area_id']);
+        $project = Project::query()->findOrFail($validated['project_id']);
         $workItem = WorkItem::query()->findOrFail($validated['work_item_id']);
 
-        if ((int) $projectArea->project_id !== (int) $validated['project_id'] || (int) $workItem->project_id !== (int) $validated['project_id']) {
+        if ((int) $workItem->project_id !== (int) $project->id) {
             throw ValidationException::withMessages([
-                'project_id' => 'Project Holding, area, dan pekerjaan harus dari project yang sama.',
-            ]);
-        }
-
-        if ((int) $workItem->project_area_id !== (int) $projectArea->id) {
-            throw ValidationException::withMessages([
-                'work_item_id' => 'Pekerjaan harus sesuai dengan area/kode yang dipilih.',
+                'project_id' => 'Project Holding dan pekerjaan harus dari project yang sama.',
             ]);
         }
 
@@ -79,7 +71,7 @@ class TransactionController extends Controller
                 ->where('status', 'active')
                 ->orderBy('name')
                 ->value('id');
-        $additionalAllocations = $this->additionalAllocations($validated, $projectArea);
+        $additionalAllocations = $this->additionalAllocations($validated, $project);
         $additionalTotal = (int) $additionalAllocations->sum('amount');
 
         if ($additionalTotal > $validated['amount']) {
@@ -88,15 +80,14 @@ class TransactionController extends Controller
                 ->withInput();
         }
 
-        $transaction = DB::transaction(function () use ($request, $validated, $projectArea, $workItem, $transactionCategoryId, $additionalAllocations, $additionalTotal) {
-            $paymentGroup = $this->paymentGroupFromTransaction($validated, $projectArea, $workItem);
+        $transaction = DB::transaction(function () use ($request, $validated, $project, $workItem, $transactionCategoryId, $additionalAllocations, $additionalTotal) {
+            $paymentGroup = $this->paymentGroupFromTransaction($validated, $project, $workItem);
             $primaryAmount = $validated['type'] === 'keluar'
                 ? $validated['amount'] - $additionalTotal
                 : $validated['amount'];
 
             $transaction = ProjectTransaction::create([
-                'project_id' => $projectArea->project_id,
-                'project_area_id' => $projectArea->id,
+                'project_id' => $project->id,
                 'transaction_category_id' => $transactionCategoryId,
                 'work_item_id' => $workItem->id,
                 'vendor_id' => $validated['vendor_id'] ?? null,
@@ -125,7 +116,7 @@ class TransactionController extends Controller
 
             foreach ($additionalAllocations as $allocation) {
                 $targetWorkItem = WorkItem::query()->findOrFail($allocation['work_item_id']);
-                $targetGroup = $this->paymentGroupForWorkItem($projectArea, $targetWorkItem);
+                $targetGroup = $this->paymentGroupForWorkItem($project, $targetWorkItem);
                 $targetTerm = $this->syncPaymentTerm(
                     $targetGroup,
                     $allocation['payment_number'] ?? $this->nextPaymentNumber($targetGroup),
@@ -165,7 +156,6 @@ class TransactionController extends Controller
         $activeProject = $this->activeProject();
         $projects = Project::query()
             ->where('status', 'active')
-            ->with('areas')
             ->orderBy('name')
             ->get();
 
@@ -175,7 +165,7 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get();
         $workItems = WorkItem::query()
-            ->with(['packageItems.vendor', 'paymentGroups.terms', 'project', 'projectArea', 'vendor'])
+            ->with(['packageItems.vendor', 'paymentGroups.terms', 'project', 'vendor'])
             ->whereHas('project', fn ($query) => $query->where('status', 'active'))
             ->orderBy('package_name')
             ->orderBy('name')
@@ -186,12 +176,6 @@ class TransactionController extends Controller
             'title' => $title,
             'activeProject' => $activeProject,
             'projects' => $projects,
-            'projectAreas' => ProjectArea::query()
-                ->with('project')
-                ->whereHas('project', fn ($query) => $query->where('status', 'active'))
-                ->orderBy('project_id')
-                ->orderBy('name')
-                ->get(),
             'categories' => $categories,
             'workItems' => $workItems,
             'workItemTerminInfo' => $this->workItemTerminInfo($workItems),
@@ -201,7 +185,7 @@ class TransactionController extends Controller
         ]);
     }
 
-    private function additionalAllocations(array $validated, ProjectArea $projectArea): Collection
+    private function additionalAllocations(array $validated, Project $project): Collection
     {
         if (($validated['type'] ?? null) !== 'keluar') {
             return collect();
@@ -222,7 +206,7 @@ class TransactionController extends Controller
         }
 
         $validWorkItemIds = WorkItem::query()
-            ->where('project_id', $projectArea->project_id)
+            ->where('project_id', $project->id)
             ->whereIn('id', $allocations->pluck('work_item_id'))
             ->pluck('id')
             ->all();
@@ -236,7 +220,7 @@ class TransactionController extends Controller
         return $allocations;
     }
 
-    private function paymentGroupFromTransaction(array $validated, ProjectArea $projectArea, WorkItem $workItem): ?PaymentGroup
+    private function paymentGroupFromTransaction(array $validated, Project $project, WorkItem $workItem): ?PaymentGroup
     {
         if ($validated['type'] !== 'keluar') {
             return null;
@@ -247,20 +231,20 @@ class TransactionController extends Controller
             : 'Termin-'.$workItem->id;
 
         return $this->paymentGroupForWorkItem(
-            $projectArea,
+            $project,
             $workItem,
             $code,
             $validated['receipt_total'] ?? null,
         );
     }
 
-    private function paymentGroupForWorkItem(ProjectArea $projectArea, WorkItem $workItem, ?string $code = null, ?int $totalAmount = null): PaymentGroup
+    private function paymentGroupForWorkItem(Project $project, WorkItem $workItem, ?string $code = null, ?int $totalAmount = null): PaymentGroup
     {
         $code ??= 'Termin-'.$workItem->id;
         $offerRupiah = (int) ($workItem->offer_rupiah ?? 0);
 
         $paymentGroup = PaymentGroup::query()
-            ->where('project_id', $projectArea->project_id)
+            ->where('project_id', $project->id)
             ->where(function ($query) use ($code, $workItem) {
                 $query
                     ->where('work_item_id', $workItem->id)
@@ -270,7 +254,7 @@ class TransactionController extends Controller
 
         if (! $paymentGroup) {
             $paymentGroup = new PaymentGroup([
-                'project_id' => $projectArea->project_id,
+                'project_id' => $project->id,
                 'work_item_id' => $workItem->id,
                 'code' => $code,
                 'name' => $workItem->name,

@@ -14,11 +14,6 @@ class Project extends Model
         'description',
     ];
 
-    public function areas(): HasMany
-    {
-        return $this->hasMany(ProjectArea::class);
-    }
-
     public function workItems(): HasMany
     {
         return $this->hasMany(WorkItem::class);

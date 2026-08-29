@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectTransaction;
 use App\Models\ProjectTransactionAllocation;
 use App\Models\TransactionCategory;
@@ -25,11 +24,6 @@ class TransactionAllocationTest extends TestCase
             'slug' => 'project-allocation-test-'.uniqid(),
             'status' => 'active',
         ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Allocation Test - K9',
-        ]);
         $vendor = Vendor::firstOrCreate(['name' => 'Arabescato Greco']);
         $category = TransactionCategory::firstOrCreate(
             ['name' => 'Jasa Tukang', 'type' => 'keluar'],
@@ -37,14 +31,12 @@ class TransactionAllocationTest extends TestCase
         );
         $mainWorkItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'name' => 'Ruang Kerja',
             'offer_rupiah' => 428087040,
         ]);
         $additionalWorkItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'name' => 'Tambahan Black Zebra',
             'offer_rupiah' => 4972800,
         ]);
@@ -52,7 +44,6 @@ class TransactionAllocationTest extends TestCase
         $response = $this->post(route('transactions.store'), [
             'type' => 'keluar',
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $mainWorkItem->id,
             'vendor_id' => $vendor->id,
@@ -96,11 +87,6 @@ class TransactionAllocationTest extends TestCase
             'slug' => 'project-automatic-termin-test-'.uniqid(),
             'status' => 'active',
         ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Automatic Termin Test - K9',
-        ]);
         $vendor = Vendor::firstOrCreate(['name' => 'Build Dec Interior']);
         $category = TransactionCategory::firstOrCreate(
             ['name' => 'Jasa Tukang', 'type' => 'keluar'],
@@ -108,7 +94,6 @@ class TransactionAllocationTest extends TestCase
         );
         $workItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'name' => 'Pekerjaan Termin Delapan',
             'offer_rupiah' => 80000000,
@@ -117,7 +102,6 @@ class TransactionAllocationTest extends TestCase
         $response = $this->post(route('transactions.store'), [
             'type' => 'keluar',
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $workItem->id,
             'vendor_id' => $vendor->id,

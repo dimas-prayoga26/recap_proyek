@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
@@ -20,16 +19,10 @@ class ProjectHoldingTest extends TestCase
             'status' => 'active',
             'description' => 'Alamat lama',
         ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Holding Lama Test - K9',
-        ]);
         ProjectOffer::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'project_name' => 'Project Holding Lama Test',
-            'area' => 'K9',
+            'area' => '',
             'pekerjaan' => 'Pekerjaan Test',
             'penawaran_rupiah' => 1000000,
         ]);
@@ -50,10 +43,6 @@ class ProjectHoldingTest extends TestCase
             'name' => 'Project Holding Baru Test',
             'slug' => 'project-holding-baru-test',
             'description' => 'Alamat baru',
-        ]);
-        $this->assertDatabaseHas('project_areas', [
-            'id' => $area->id,
-            'name' => 'Project Holding Baru Test - K9',
         ]);
         $this->assertDatabaseHas('project_offers', [
             'project_id' => $project->id,

@@ -32,6 +32,7 @@ class VendorController extends Controller
         return view('pages.vendor-form', [
             'title' => 'Vendor',
             'activeProject' => $activeProject,
+            'projects' => Project::query()->where('status', 'active')->orderBy('name')->get(),
             'vendors' => $vendors,
             'filters' => $filters,
         ]);

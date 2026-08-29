@@ -2,7 +2,6 @@
   $selectedProject = old('project_id')
     ? ($projects ?? collect())->firstWhere('id', (int) old('project_id'))
     : $activeProject;
-  $selectedArea = old('area', $filters['area'] ?? ($areas ?? collect())->first()?->code ?? 'K9');
 @endphp
 
 @extends('layouts.app')
@@ -106,7 +105,7 @@
       min-width: 260px;
     }
 
-    .offer-work-area {
+    .offer-work-meta {
       color: #697586;
       display: block;
       font-size: 12px;
@@ -117,7 +116,7 @@
       align-items: end;
       display: grid;
       gap: 12px;
-      grid-template-columns: minmax(220px, 1.4fr) minmax(140px, 0.8fr) minmax(160px, 1fr) minmax(140px, 0.8fr) auto;
+      grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) minmax(140px, 0.8fr) auto;
     }
 
     .offer-filter-action {
@@ -141,7 +140,7 @@
       margin-bottom: 8px;
     }
 
-    .package-row-area,
+    .package-row-work,
     .package-row-material {
       flex: 1 1 0;
     }
@@ -196,6 +195,19 @@
     .searchable-select-item.is-active {
       background: #eef6ff;
       color: #2196f3;
+    }
+
+    .searchable-select-badge {
+      background: #e3f9e5;
+      border-radius: 999px;
+      color: #1a9c47;
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+      padding: 2px 8px;
+      text-transform: uppercase;
     }
 
     .searchable-select-empty {
@@ -272,41 +284,53 @@
             <div class="row">
               <div class="col-md-12">
                 <div class="mb-4">
-                  <label for="project-select" class="form-label d-block">Project Holding</label>
-                  <select class="form-select @error('project_id') is-invalid @enderror" id="project-select" name="project_id" required>
-                    @forelse (($projects ?? collect()) as $project)
-                      <option value="{{ $project->id }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>{{ $project->name }}</option>
-                    @empty
-                      <option value="">Project holding belum tersedia</option>
-                    @endforelse
-                  </select>
+                  <label for="project-select-search" class="form-label d-block">Project Holding</label>
+                  <div class="searchable-select js-searchable-select">
+                    <input type="text" class="form-control searchable-select-input @error('project_id') is-invalid @enderror" id="project-select-search" data-role="search-input" placeholder="Cari project holding..." autocomplete="off" />
+                    <div class="searchable-select-menu" data-role="menu"></div>
+                    <select class="form-select d-none" id="project-select" name="project_id" data-role="source" required>
+                      @forelse (($projects ?? collect()) as $project)
+                        <option value="{{ $project->id }}" data-active="{{ $trueActiveProjectId === $project->id ? '1' : '0' }}" @selected((int) old('project_id', $selectedProject?->id) === $project->id)>{{ $project->name }}</option>
+                      @empty
+                        <option value="">Project holding belum tersedia</option>
+                      @endforelse
+                    </select>
+                  </div>
                   @error('project_id')
-                    <div class="invalid-feedback">{{ $message }}</div>
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
                   @enderror
                 </div>
               </div>
-              <div class="col-md-6 d-none">
-                <div class="mb-4">
-                  <label for="area-select" class="form-label d-block">Area / Kode</label>
-                  <select class="form-select @error('area') is-invalid @enderror" id="area-select" name="area" required>
-                    @forelse (($areas ?? collect()) as $areaOption)
-                      <option value="{{ $areaOption->code }}" @selected($selectedArea === $areaOption->code)>{{ $areaOption->code }}</option>
-                    @empty
-                      <option value="K9" selected>K9</option>
-                    @endforelse
-                    <option value="__new__" @selected(old('area') === '__new__')>+ Tambah Area/Kode Baru</option>
-                  </select>
-                  @error('area')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                  @enderror
-                  <span class="form-helper">K9/K8/C21 adalah area di bawah Project Holding yang dipilih.</span>
+            </div>
+
+            <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <form method="POST" action="{{ route('dashboard.active-project') }}">
+                    @csrf
+                    <input type="hidden" name="project_id" id="project-activate-id" value="" />
+                    <input type="hidden" name="redirect_to" value="{{ route('kategori-pekerjaan.index', [], false) }}" />
+                    <div class="modal-header">
+                      <h5 class="modal-title">Jadikan Project Aktif?</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                      <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-check me-1"></i> Ya, Aktifkan
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             </div>
 
             <div class="mb-4 form-check d-none">
               <input type="checkbox" class="form-check-input" id="package-toggle" />
-              <label class="form-check-label" for="package-toggle">Ini paket gabungan beberapa area/pekerjaan (harga satu paket)</label>
+              <label class="form-check-label" for="package-toggle">Ini paket gabungan beberapa pekerjaan (harga satu paket)</label>
             </div>
 
             <div class="row">
@@ -341,13 +365,13 @@
             </div>
 
             <div class="mb-4 d-none" id="package-builder">
-              <label class="form-label d-block">Daftar Area dalam Paket</label>
+              <label class="form-label d-block">Daftar Pekerjaan dalam Paket</label>
               <div id="package-rows"></div>
               <button type="button" class="btn btn-sm btn-light-secondary mt-1" id="package-add-row">
-                <i class="ti ti-plus me-1"></i> Tambah Area
+                <i class="ti ti-plus me-1"></i> Tambah Pekerjaan
               </button>
-              <span class="form-helper mb-0 d-block">Daftar ini disimpan sebagai item paket terpisah. Minimal isi 2 area.</span>
-              <span class="form-helper text-danger d-none" id="package-error">Isi minimal 2 nama area sebelum menyimpan paket.</span>
+              <span class="form-helper mb-0 d-block">Daftar ini disimpan sebagai item paket terpisah. Minimal isi 2 pekerjaan.</span>
+              <span class="form-helper text-danger d-none" id="package-error">Isi minimal 2 nama pekerjaan sebelum menyimpan paket.</span>
               @error('package_items')
                 <span class="form-helper text-danger">{{ $message }}</span>
               @enderror
@@ -403,25 +427,6 @@
         </div>
       </div>
 
-      <div class="modal fade" id="new-area-modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Tambah Kategori Baru</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <label for="new-area-modal-input" class="form-label">Nama Kategori</label>
-              <input type="text" class="form-control" id="new-area-modal-input" placeholder="Contoh: K10" maxlength="20" />
-              <span class="form-helper text-danger d-none" id="new-area-modal-error">Nama kategori tidak boleh kosong.</span>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
-              <button type="button" class="btn btn-primary" id="new-area-modal-confirm">Tambah</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="col-xl-4">
@@ -432,7 +437,7 @@
               <small class="text-muted">Preview</small>
               <h4 class="mb-0">Ringkasan Kategori</h4>
             </div>
-            <span class="badge bg-light-primary text-primary" id="summary-area">K9</span>
+            <span class="badge bg-light-primary text-primary" id="summary-project">{{ $selectedProject?->name ?? '-' }}</span>
           </div>
           <div class="offer-summary-line">
             <span>Pekerjaan</span>
@@ -463,7 +468,7 @@
               <h4 class="mb-0">Daftar Kategori Pekerjaan</h4>
             </div>
             <div class="col-auto">
-              <span class="badge bg-light-primary text-primary">{{ $offers->total() }} data {{ $filters['area'] ?? 'K9' }}</span>
+              <span class="badge bg-light-primary text-primary">{{ $offers->total() }} data</span>
             </div>
           </div>
         </div>
@@ -480,15 +485,7 @@
                 placeholder="Pekerjaan, vendor, atau merk"
               />
             </div>
-            <div>
-              <input type="hidden" name="project_id" value="{{ $filters['project_id'] }}" />
-              <label for="filter-area" class="form-label">Area</label>
-              <select class="form-select" id="filter-area" name="area">
-                @foreach ($areas as $area)
-                  <option value="{{ $area->code }}" @selected(($filters['area'] ?? 'K9') === $area->code)>{{ $area->code }}</option>
-                @endforeach
-              </select>
-            </div>
+            <input type="hidden" name="project_id" value="{{ $filters['project_id'] }}" />
             <div>
               <label for="filter-brand" class="form-label">Vendor</label>
               <select class="form-select" id="filter-brand" name="brand">
@@ -529,17 +526,12 @@
                 </tr>
               </thead>
               <tbody id="offer-table-body">
-                @forelse ($offers->getCollection()->groupBy('area') as $areaName => $areaOffers)
-                  <tr class="offer-group-row">
-                    <td colspan="6">{{ $areaName }} · {{ $areaOffers->count() }} data</td>
-                  </tr>
-                  @foreach ($areaOffers as $offer)
+                @forelse ($offers as $offer)
                     <tr>
                       <td>
                         <span class="offer-work-title">{{ $offer->pekerjaan }}</span>
-                        <span class="offer-work-area">{{ $offer->area }}</span>
                         @if ($offer->workItem?->packageItems?->isNotEmpty())
-                          <span class="offer-work-area">
+                          <span class="offer-work-meta">
                             Paket:
                             {{ $offer->workItem->packageItems->pluck('name')->join(', ') }}
                           </span>
@@ -556,7 +548,6 @@
                             class="btn btn-sm btn-light-secondary offer-edit-btn"
                             data-id="{{ $offer->id }}"
                             data-project-id="{{ $offer->project_id }}"
-                            data-area="{{ $offer->area }}"
                             data-pekerjaan="{{ $offer->pekerjaan }}"
                             data-vendor-id="{{ $offer->vendor_id }}"
                             data-usd="{{ $offer->penawaran_usd }}"
@@ -576,7 +567,6 @@
                         </div>
                       </td>
                     </tr>
-                  @endforeach
                 @empty
                   <tr>
                     <td colspan="6" class="text-center text-muted py-4">Belum ada kategori pekerjaan.</td>
@@ -605,12 +595,6 @@
     document.addEventListener('DOMContentLoaded', function () {
       const form = document.querySelector('#offer-form');
       const projectSelect = document.querySelector('#project-select');
-      const areaSelect = document.querySelector('#area-select');
-      const newAreaModalEl = document.querySelector('#new-area-modal');
-      const newAreaModal = new bootstrap.Modal(newAreaModalEl);
-      const newAreaModalInput = document.querySelector('#new-area-modal-input');
-      const newAreaModalError = document.querySelector('#new-area-modal-error');
-      const newAreaModalConfirm = document.querySelector('#new-area-modal-confirm');
       const workInput = document.querySelector('#work-name');
       const workLabel = document.querySelector('#work-name-label');
       const workCol = document.querySelector('#work-name-col');
@@ -680,7 +664,17 @@
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'searchable-select-item' + (option.value === select.value ? ' is-active' : '');
-            item.textContent = option.textContent.trim();
+
+            const label = document.createElement('span');
+            label.textContent = option.textContent.trim();
+            item.appendChild(label);
+
+            if (option.dataset.active === '1') {
+              const badge = document.createElement('span');
+              badge.className = 'searchable-select-badge';
+              badge.textContent = 'Aktif';
+              item.appendChild(badge);
+            }
 
             item.addEventListener('mousedown', function (event) {
               event.preventDefault();
@@ -724,12 +718,47 @@
       }
 
       const vendorSearchableSelect = enhanceSearchableSelect(vendorSelect.closest('.js-searchable-select'));
+      const projectSearchableSelect = enhanceSearchableSelect(projectSelect.closest('.js-searchable-select'));
 
-      let lastValidAreaValue = areaSelect.value;
+      const projectActivateModalEl = document.querySelector('#project-activate-modal');
+
+      if (projectActivateModalEl) {
+        const projectActivateModal = new bootstrap.Modal(projectActivateModalEl);
+        const projectActivateIdInput = document.querySelector('#project-activate-id');
+        const projectActivateNameEl = document.querySelector('#project-activate-name');
+        const trueActiveProjectId = '{{ $trueActiveProjectId }}';
+        let lastConfirmedProjectId = projectSelect.value;
+        let projectActivateConfirmed = false;
+
+        projectSelect.addEventListener('change', function () {
+          if (!trueActiveProjectId || projectSelect.value === trueActiveProjectId) {
+            lastConfirmedProjectId = projectSelect.value;
+            window.location.href = '{{ route('kategori-pekerjaan.index') }}?project_id=' + encodeURIComponent(projectSelect.value);
+            return;
+          }
+
+          const option = projectSelect.selectedOptions[0];
+          projectActivateIdInput.value = projectSelect.value;
+          projectActivateNameEl.textContent = option ? option.textContent.trim() : '';
+          projectActivateConfirmed = false;
+          projectActivateModal.show();
+        });
+
+        projectActivateModalEl.querySelector('form').addEventListener('submit', function () {
+          projectActivateConfirmed = true;
+        });
+
+        projectActivateModalEl.addEventListener('hidden.bs.modal', function () {
+          if (!projectActivateConfirmed) {
+            projectSelect.value = lastConfirmedProjectId;
+            projectSearchableSelect.sync();
+          }
+        });
+      }
 
       function refreshPackageRowNames() {
         Array.from(packageRows.querySelectorAll('.package-row')).forEach(function (row, index) {
-          row.querySelector('.package-row-area').name = 'package_items[' + index + '][name]';
+          row.querySelector('.package-row-work').name = 'package_items[' + index + '][name]';
           row.querySelector('.package-row-material').name = 'package_items[' + index + '][brand]';
         });
       }
@@ -738,7 +767,7 @@
         const row = document.createElement('div');
         row.className = 'package-row';
         row.innerHTML =
-          '<input type="text" class="form-control package-row-area" placeholder="Nama area, contoh: Ruang Kerja" />'
+          '<input type="text" class="form-control package-row-work" placeholder="Nama pekerjaan, contoh: Ruang Kerja" />'
           + '<input type="text" class="form-control package-row-material" placeholder="Vendor, contoh: Build Dec Interior" />'
           + '<button type="button" class="btn btn-light-secondary package-row-remove"><i class="ti ti-trash"></i></button>';
 
@@ -749,7 +778,7 @@
         });
 
         packageRows.appendChild(row);
-        row.querySelector('.package-row-area').value = data && data.name ? data.name : '';
+        row.querySelector('.package-row-work').value = data && data.name ? data.name : '';
         row.querySelector('.package-row-material').value = data && data.brand ? data.brand : '';
         row.querySelectorAll('input').forEach(function (input) {
           input.addEventListener('input', updateSummary);
@@ -773,29 +802,6 @@
         }
       }
 
-      function selectedArea() {
-        return areaSelect.value;
-      }
-
-      function addNewAreaOption(value) {
-        const existing = Array.from(areaSelect.options).find(function (option) {
-          return option.value !== '__new__' && option.value.toLowerCase() === value.toLowerCase();
-        });
-
-        if (existing) {
-          areaSelect.value = existing.value;
-        } else {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = value;
-          areaSelect.insertBefore(option, areaSelect.querySelector('option[value="__new__"]'));
-          areaSelect.value = value;
-        }
-
-        lastValidAreaValue = areaSelect.value;
-        updateSummary();
-      }
-
       function formatIdr(value) {
         return Number(value || 0) > 0 ? 'Rp ' + idrFormatter.format(Number(value)) : '-';
       }
@@ -809,12 +815,17 @@
         return option && option.value !== '' ? option.textContent.trim() : '';
       }
 
+      function selectedText(select) {
+        const option = select.selectedOptions[0];
+        return option ? option.textContent.trim() : '';
+      }
+
       function updateSummary() {
         const firstPackageBrand = Array.from(packageRows.querySelectorAll('.package-row-material'))
           .map(function (input) { return input.value.trim(); })
           .find(function (value) { return value !== ''; });
 
-        document.querySelector('#summary-area').textContent = selectedArea();
+        document.querySelector('#summary-project').textContent = selectedText(projectSelect) || '-';
         document.querySelector('#summary-work').textContent = workInput.value.trim() || 'Belum diisi';
         document.querySelector('#summary-brand').textContent = packageToggle.checked
           ? (firstPackageBrand || selectedVendorName() || '-')
@@ -828,53 +839,6 @@
       });
 
       vendorSelect.addEventListener('change', updateSummary);
-
-      projectSelect.addEventListener('change', function () {
-        window.location.href = '{{ route('kategori-pekerjaan.index') }}?project_id=' + encodeURIComponent(projectSelect.value);
-      });
-
-      areaSelect.addEventListener('change', function () {
-        if (areaSelect.value === '__new__') {
-          areaSelect.value = lastValidAreaValue;
-          newAreaModalInput.value = '';
-          newAreaModalError.classList.add('d-none');
-          newAreaModalInput.classList.remove('is-invalid');
-          newAreaModal.show();
-          return;
-        }
-
-        lastValidAreaValue = areaSelect.value;
-        updateSummary();
-      });
-
-      newAreaModalEl.addEventListener('shown.bs.modal', function () {
-        newAreaModalInput.focus();
-      });
-
-      newAreaModalConfirm.addEventListener('click', function () {
-        const value = newAreaModalInput.value.trim();
-
-        if (!value) {
-          newAreaModalError.classList.remove('d-none');
-          newAreaModalInput.classList.add('is-invalid');
-          return;
-        }
-
-        addNewAreaOption(value);
-        newAreaModal.hide();
-      });
-
-      newAreaModalInput.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          newAreaModalConfirm.click();
-        }
-      });
-
-      newAreaModalInput.addEventListener('input', function () {
-        newAreaModalError.classList.add('d-none');
-        newAreaModalInput.classList.remove('is-invalid');
-      });
 
       packageToggle.addEventListener('change', function () {
         togglePackageMode(packageToggle.checked);
@@ -892,7 +856,7 @@
         const entries = Array.from(packageRows.querySelectorAll('.package-row'))
           .map(function (row) {
             return {
-              name: row.querySelector('.package-row-area').value.trim(),
+              name: row.querySelector('.package-row-work').value.trim(),
               brand: row.querySelector('.package-row-material').value.trim(),
             };
           })
@@ -908,7 +872,7 @@
       });
 
       function parsePackageNote(catatan) {
-        const match = /^Paket gabungan \d+ area \(harga satu paket, bukan per-area\):\s*(.+?)\.\s*(?:Kontraktor:\s*(.*?)\.\s*)?Total penawaran/.exec(catatan || '');
+        const match = /^Paket gabungan \d+ (?:area|pekerjaan) \(harga satu paket, bukan per-(?:area|pekerjaan)\):\s*(.+?)\.\s*(?:Kontraktor:\s*(.*?)\.\s*)?Total penawaran/.exec(catatan || '');
 
         if (!match) {
           return null;
@@ -922,11 +886,11 @@
             const segmentMatch = /^(.*)\s\(([^)]+)\)$/.exec(segment.trim());
 
             return segmentMatch
-              ? { area: segmentMatch[1].trim(), material: segmentMatch[2].trim() }
-              : { area: segment.trim(), material: sharedContractor };
+              ? { name: segmentMatch[1].trim(), material: segmentMatch[2].trim() }
+              : { name: segment.trim(), material: sharedContractor };
           })
           .filter(function (entry) {
-            return entry.area !== '';
+            return entry.name !== '';
           });
 
         return entries.length >= 2 ? entries : null;
@@ -937,9 +901,8 @@
         const storedPackageEntries = JSON.parse(data.packageItems || '[]');
         const packageEntries = storedPackageEntries.length > 0 ? storedPackageEntries : parsePackageNote(data.catatan);
 
-        areaSelect.value = data.area;
         projectSelect.value = data.projectId || projectSelect.value;
-        lastValidAreaValue = data.area;
+        projectSearchableSelect.sync();
         vendorSelect.value = data.vendorId || '';
         vendorSearchableSelect.sync();
         usdInput.value = data.usd || '';
@@ -954,7 +917,7 @@
 
           packageEntries.forEach(function (entry) {
             addPackageRow({
-              name: entry.name || entry.area,
+              name: entry.name,
               brand: entry.brand || entry.material,
             });
           });

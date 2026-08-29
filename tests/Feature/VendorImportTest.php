@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\ProjectOffer;
 use App\Models\Vendor;
 use App\Models\WorkItem;
@@ -46,19 +45,13 @@ class VendorImportTest extends TestCase
     public function test_vendor_can_be_updated_and_related_brand_snapshots_are_synced(): void
     {
         $project = Project::create([
-            'name' => 'Project Kemang',
-            'slug' => 'project-kemang-test',
+            'name' => 'Project Kemang K8',
+            'slug' => 'project-kemang-k8-test',
             'status' => 'active',
-        ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K8',
-            'name' => 'Project Kemang - K8',
         ]);
         $vendor = Vendor::create(['name' => 'Vendor Lama Test']);
         $workItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'name' => 'Pembelian Pohon',
             'brand' => 'Vendor Lama Test',
@@ -67,11 +60,10 @@ class VendorImportTest extends TestCase
 
         ProjectOffer::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'work_item_id' => $workItem->id,
             'project_name' => $project->name,
-            'area' => $area->code,
+            'area' => '',
             'pekerjaan' => $workItem->name,
             'brand' => 'Vendor Lama Test',
             'penawaran_rupiah' => 8800000,
@@ -126,15 +118,9 @@ class VendorImportTest extends TestCase
             'slug' => 'project-vendor-delete-'.uniqid(),
             'status' => 'active',
         ]);
-        $area = ProjectArea::create([
-            'project_id' => $project->id,
-            'code' => 'K9',
-            'name' => 'Project Vendor Delete - K9',
-        ]);
         $vendor = Vendor::create(['name' => 'Vendor Hapus Test']);
         $workItem = WorkItem::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'name' => 'Pekerjaan Vendor Hapus',
             'brand' => 'Vendor Hapus Test',
@@ -142,11 +128,10 @@ class VendorImportTest extends TestCase
         ]);
         ProjectOffer::create([
             'project_id' => $project->id,
-            'project_area_id' => $area->id,
             'vendor_id' => $vendor->id,
             'work_item_id' => $workItem->id,
             'project_name' => $project->name,
-            'area' => 'K9',
+            'area' => '',
             'pekerjaan' => 'Pekerjaan Vendor Hapus',
             'brand' => 'Vendor Hapus Test',
             'penawaran_rupiah' => 1000000,

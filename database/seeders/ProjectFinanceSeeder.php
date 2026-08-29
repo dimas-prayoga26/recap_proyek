@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\ActiveProjectSelection;
 use App\Models\PaymentGroup;
 use App\Models\Project;
-use App\Models\ProjectArea;
 use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
@@ -19,28 +18,23 @@ class ProjectFinanceSeeder extends Seeder
      */
     public function run(): void
     {
-        $project = Project::firstOrCreate(
-            ['slug' => 'project-kemang'],
-            [
-                'name' => 'Project Kemang',
-                'status' => 'active',
-                'description' => 'Project utama untuk pencatatan keuangan Kemang.',
-            ],
-        );
+        $projects = collect([
+            ['code' => 'K9', 'name' => 'Project Kemang K9'],
+            ['code' => 'K8', 'name' => 'Project Kemang K8'],
+            ['code' => 'C21', 'name' => 'Project Kemang C21'],
+            ['code' => 'Lainnya', 'name' => 'Project Kemang Lainnya'],
+        ])->mapWithKeys(fn (array $project) => [
+            $project['code'] => Project::firstOrCreate(
+                ['slug' => Str::slug($project['name'])],
+                [
+                    'name' => $project['name'],
+                    'status' => 'active',
+                    'description' => 'Project holding untuk pencatatan keuangan Kemang.',
+                ],
+            ),
+        ]);
 
-        $areas = collect([
-            ['code' => 'K9', 'name' => 'Project Kemang - K9'],
-            ['code' => 'K8', 'name' => 'Project Kemang - K8'],
-            ['code' => 'C21', 'name' => 'Project Kemang - C21'],
-            ['code' => 'Lainnya', 'name' => 'Project Kemang - Lainnya'],
-        ])->mapWithKeys(function (array $area) use ($project) {
-            $model = ProjectArea::firstOrCreate(
-                ['project_id' => $project->id, 'code' => $area['code']],
-                ['name' => $area['name']],
-            );
-
-            return [$area['code'] => $model];
-        });
+        $project = $projects['K9'];
 
         foreach (['Dana Client', 'DP Project', 'Pelunasan', 'Reimbursement', 'Modal Tambahan'] as $name) {
             TransactionCategory::firstOrCreate(['name' => $name, 'type' => 'masuk']);
@@ -81,8 +75,7 @@ class ProjectFinanceSeeder extends Seeder
 
             WorkItem::firstOrCreate(
                 [
-                    'project_id' => $project->id,
-                    'project_area_id' => $areas[$item['area']]->id,
+                    'project_id' => $projects[$item['area']]->id,
                     'name' => $item['name'],
                 ],
                 [
