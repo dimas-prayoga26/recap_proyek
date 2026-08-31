@@ -149,6 +149,11 @@
         width: 34px;
       }
 
+      .project-switcher-info {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
       .project-switcher-label {
         color: #697586;
         display: block;
@@ -163,6 +168,9 @@
         font-weight: 600;
         line-height: 1.25;
         margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .project-switcher .dropdown-menu {

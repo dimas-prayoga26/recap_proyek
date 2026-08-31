@@ -8,9 +8,9 @@
     <input type="hidden" id="active-project" value="{{ $activeProject?->slug ?? '' }}" />
     <button class="btn project-switcher-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
       <span class="project-switcher-icon"><i class="ti ti-folders"></i></span>
-      <span>
+      <span class="project-switcher-info">
         <span class="project-switcher-label">Proyek Aktif</span>
-        <span class="project-switcher-name" id="active-project-name">{{ $activeProject?->name ?? 'Belum ada project' }}</span>
+        <span class="project-switcher-name" id="active-project-name" title="{{ $activeProject?->name ?? 'Belum ada project' }}">{{ $activeProject?->name ?? 'Belum ada project' }}</span>
       </span>
     </button>
     <ul class="dropdown-menu dropdown-menu-end" id="project-menu">
