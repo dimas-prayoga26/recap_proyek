@@ -142,7 +142,7 @@
         <div class="card-header">
           <div class="row align-items-center">
             <div class="col">
-              <small class="text-muted">{{ $activeProject?->name ?? 'Belum ada project holding aktif' }}</small>
+              <small class="text-muted">Master vendor semua project holding</small>
               <h4 class="mb-0">Daftar Vendor</h4>
             </div>
             <div class="col-auto d-flex align-items-center gap-2">
@@ -278,7 +278,7 @@
                   @endforelse
                 </select>
               </div>
-              <span class="form-helper">Vendor tersimpan secara umum, tapi pilih dulu project holding yang lagi dikerjakan.</span>
+              <span class="form-helper">Vendor tersimpan secara umum dan bisa dipakai di semua project holding.</span>
             </div>
             <div class="mb-3">
               <label for="vendor-name" class="form-label">Nama Vendor</label>
@@ -392,7 +392,7 @@
           </div>
           <div class="modal-body">
             <p class="text-muted">
-              Upload file CSV berisi daftar vendor supaya tidak perlu input satu-satu, cocok dipakai saat mulai project holding baru.
+              Upload file CSV berisi daftar master vendor supaya tidak perlu input satu-satu.
               Kolomnya harus sama seperti hasil <a href="{{ route('vendor.export', $filters) }}">Export Vendor</a>: <strong>Nama Vendor, Nama Kontak, No. Telepon, Catatan</strong>.
               Vendor yang namanya sudah ada otomatis dilewati.
             </p>

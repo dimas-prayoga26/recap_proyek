@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActiveProjectSelection;
 use App\Models\Project;
 use App\Models\ProjectOffer;
 use App\Models\Vendor;
@@ -14,6 +15,45 @@ use Tests\TestCase;
 class VendorImportTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_vendor_index_shows_vendors_from_every_active_project_holding(): void
+    {
+        $firstProject = Project::create([
+            'name' => 'Project Vendor Global A',
+            'slug' => 'project-vendor-global-a-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $secondProject = Project::create([
+            'name' => 'Project Vendor Global B',
+            'slug' => 'project-vendor-global-b-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $secondProject->id],
+        );
+        $vendor = Vendor::create(['name' => 'Vendor Dari Holding Lain']);
+
+        WorkItem::create([
+            'project_id' => $firstProject->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Holding Lain',
+            'brand' => 'Vendor Dari Holding Lain',
+        ]);
+
+        $response = $this->get(route('vendor.index', [
+            'search' => 'Vendor Dari Holding Lain',
+        ]));
+
+        $response
+            ->assertSee('Vendor Dari Holding Lain')
+            ->assertViewHas('vendors', function ($vendors) use ($vendor): bool {
+                $listedVendor = $vendors->getCollection()->firstWhere('id', $vendor->id);
+
+                return $listedVendor !== null
+                    && $listedVendor->work_items_count === 1;
+            });
+    }
 
     public function test_import_creates_new_vendors_and_skips_existing_names(): void
     {

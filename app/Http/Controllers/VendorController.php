@@ -25,7 +25,7 @@ class VendorController extends Controller
 
         $activeProject = $this->activeProject();
 
-        $vendors = $this->filteredVendorsQuery($activeProject, $filters)
+        $vendors = $this->filteredVendorsQuery($filters)
             ->paginate(15)
             ->withQueryString();
 
@@ -168,8 +168,7 @@ class VendorController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $activeProject = $this->activeProject();
-        $vendors = $this->filteredVendorsQuery($activeProject, $filters)->get();
+        $vendors = $this->filteredVendorsQuery($filters)->get();
 
         $rows = array_merge(
             [['Nama Vendor', 'Nama Kontak', 'No. Telepon', 'Catatan', 'Jumlah Pekerjaan', 'Jumlah Penawaran']],
@@ -191,7 +190,7 @@ class VendorController extends Controller
             })
             ->implode("\r\n");
 
-        $filename = 'vendor-'.($activeProject?->slug ?? 'semua').'-'.now()->format('Ymd-His').'.csv';
+        $filename = 'vendor-semua-project-'.now()->format('Ymd-His').'.csv';
 
         return response("\xEF\xBB\xBF".$csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -202,24 +201,10 @@ class VendorController extends Controller
     /**
      * @param  array{search?: string|null}  $filters
      */
-    private function filteredVendorsQuery(?Project $activeProject, array $filters): Builder
+    private function filteredVendorsQuery(array $filters): Builder
     {
         return Vendor::query()
-            ->withCount([
-                'workItems' => fn ($query) => $query->when($activeProject, fn ($query) => $query->where('project_id', $activeProject->id)),
-                'offers' => fn ($query) => $query->when($activeProject, fn ($query) => $query->where('project_id', $activeProject->id)),
-            ])
-            ->when($activeProject, function ($query) use ($activeProject) {
-                $query->where(function ($query) use ($activeProject) {
-                    $query
-                        ->whereHas('workItems', fn ($query) => $query->where('project_id', $activeProject->id))
-                        ->orWhereHas('offers', fn ($query) => $query->where('project_id', $activeProject->id))
-                        ->orWhereHas('transactions', fn ($query) => $query->where('project_id', $activeProject->id))
-                        ->orWhere(function ($query) {
-                            $query->doesntHave('workItems')->doesntHave('offers')->doesntHave('transactions');
-                        });
-                });
-            })
+            ->withCount(['workItems', 'offers'])
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query
