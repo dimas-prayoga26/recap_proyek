@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActiveProjectSelection;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
@@ -16,6 +17,39 @@ use Tests\TestCase;
 class TransactionAllocationTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_expense_form_exposes_usd_offer_for_usd_only_work_item(): void
+    {
+        $project = Project::create([
+            'name' => 'Project USD Termin Test',
+            'slug' => 'project-usd-termin-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+        $vendor = Vendor::firstOrCreate(['name' => 'Akmal']);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pengerjaan Pagar Rumah USD',
+            'offer_usd' => 100,
+        ]);
+
+        $response = $this->get(route('uang-keluar.index', ['work_item_id' => $workItem->id]));
+
+        $response
+            ->assertSee('id="amount-currency-switch"', false)
+            ->assertSee('name="amount_display"', false)
+            ->assertSee('data-currency="USD"', false)
+            ->assertViewHas('workItemTerminInfo', function (array $workItemTerminInfo) use ($workItem): bool {
+                return isset($workItemTerminInfo[$workItem->id])
+                    && $workItemTerminInfo[$workItem->id]['offer'] === 0
+                    && $workItemTerminInfo[$workItem->id]['offer_rupiah'] === 0
+                    && $workItemTerminInfo[$workItem->id]['offer_usd'] === 100.0;
+            });
+    }
 
     public function test_expense_transaction_can_allocate_overpayment_to_another_work_item(): void
     {

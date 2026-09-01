@@ -303,31 +303,6 @@
               </div>
             </div>
 
-            <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <form method="POST" action="{{ route('dashboard.active-project') }}">
-                    @csrf
-                    <input type="hidden" name="project_id" id="project-activate-id" value="" />
-                    <input type="hidden" name="redirect_to" value="{{ route('kategori-pekerjaan.index', [], false) }}" />
-                    <div class="modal-header">
-                      <h5 class="modal-title">Jadikan Project Aktif?</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                      <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
-                      <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-check me-1"></i> Ya, Aktifkan
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
             <div class="mb-4 form-check d-none">
               <input type="checkbox" class="form-check-input" id="package-toggle" />
               <label class="form-check-label" for="package-toggle">Ini paket gabungan beberapa pekerjaan (harga satu paket)</label>
@@ -424,6 +399,31 @@
               </button>
             </div>
           </form>
+
+          <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <form method="POST" action="{{ route('dashboard.active-project') }}">
+                  @csrf
+                  <input type="hidden" name="project_id" id="project-activate-id" value="" />
+                  <input type="hidden" name="redirect_to" value="{{ route('kategori-pekerjaan.index', [], false) }}" />
+                  <div class="modal-header">
+                    <h5 class="modal-title">Jadikan Project Aktif?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                      <i class="ti ti-check me-1"></i> Ya, Aktifkan
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

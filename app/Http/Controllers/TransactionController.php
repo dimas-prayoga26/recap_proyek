@@ -354,6 +354,7 @@ class TransactionController extends Controller
                     ])
                     ->values() ?? collect();
                 $offer = (int) ($paymentGroup?->offer_rupiah_snapshot ?? $paymentGroup?->total_amount ?? $workItem->offer_rupiah ?? 0);
+                $offerUsd = $paymentGroup?->offer_usd_snapshot ?? $workItem->offer_usd;
                 $paid = (int) $terms->sum('amount');
                 $remaining = $offer - $paid;
                 $highestPaymentNumber = (int) ($terms->max('number') ?? 0);
@@ -366,6 +367,8 @@ class TransactionController extends Controller
                 return [
                     $workItem->id => [
                         'offer' => $offer,
+                        'offer_rupiah' => $offer,
+                        'offer_usd' => $offerUsd !== null ? (float) $offerUsd : null,
                         'paid' => $paid + $allocatedToOthers,
                         'remaining' => $remaining,
                         'allocated_to_others' => $allocatedToOthers,

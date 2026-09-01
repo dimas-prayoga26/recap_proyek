@@ -158,6 +158,25 @@
       color: #fff;
     }
 
+    .amount-currency-switch {
+      background: #f8fafc;
+      border-right: 0;
+      gap: 3px;
+      padding: 4px;
+    }
+
+    .amount-currency-switch button {
+      min-width: 38px;
+      padding: 5px 8px;
+    }
+
+    .amount-helper {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      min-height: 18px;
+    }
+
     .work-termin-package {
       border-top: 1px solid #e3e8ef;
       margin-top: 14px;
@@ -457,31 +476,6 @@
               </div>
             </div>
 
-            <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <form method="POST" action="{{ route('dashboard.active-project') }}">
-                    @csrf
-                    <input type="hidden" name="project_id" id="project-activate-id" value="" />
-                    <input type="hidden" name="redirect_to" value="{{ $isIncome ? route('uang-masuk.index', [], false) : route('uang-keluar.index', [], false) }}" />
-                    <div class="modal-header">
-                      <h5 class="modal-title">Jadikan Project Aktif?</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                      <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
-                      <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-check me-1"></i> Ya, Aktifkan
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
             <div class="row">
               <div class="col-md-6">
                 <div class="mb-3">
@@ -573,14 +567,21 @@
             <div class="row">
               <div class="col-md-6">
                 <div class="mb-3">
-                  <label for="amount" class="form-label">Nominal</label>
+                  <label for="amount-display" class="form-label">Nominal</label>
+                  <input type="hidden" id="amount" name="amount" value="{{ old('amount') }}" />
+                  <input type="hidden" id="amount-currency" name="amount_currency" value="{{ old('amount_currency', 'IDR') }}" />
+                  <input type="hidden" id="amount-exchange-rate" name="amount_exchange_rate" value="{{ old('amount_exchange_rate') }}" />
                   <div class="input-group">
-                    <span class="input-group-text">Rp</span>
-                    <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount" name="amount" min="0" step="1" placeholder="0" value="{{ old('amount') }}" required />
+                    <span class="input-group-text amount-currency-switch termin-currency-switch" id="amount-currency-switch">
+                      <button type="button" data-currency="IDR" @class(['is-active' => old('amount_currency', 'IDR') !== 'USD'])>Rp</button>
+                      <button type="button" data-currency="USD" @class(['is-active' => old('amount_currency') === 'USD'])>USD</button>
+                    </span>
+                    <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount-display" name="amount_display" min="0" step="{{ old('amount_currency') === 'USD' ? '0.01' : '1' }}" placeholder="0" value="{{ old('amount_display', old('amount')) }}" required />
                     @error('amount')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                   </div>
+                  <span class="form-helper amount-helper" id="amount-helper"></span>
                 </div>
               </div>
               <div class="col-md-6">
@@ -699,6 +700,31 @@
               </button>
             </div>
           </form>
+
+          <div class="modal fade" id="project-activate-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <form method="POST" action="{{ route('dashboard.active-project') }}">
+                  @csrf
+                  <input type="hidden" name="project_id" id="project-activate-id" value="" />
+                  <input type="hidden" name="redirect_to" value="{{ $isIncome ? route('uang-masuk.index', [], false) : route('uang-keluar.index', [], false) }}" />
+                  <div class="modal-header">
+                    <h5 class="modal-title">Jadikan Project Aktif?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p class="mb-0">"<strong id="project-activate-name"></strong>" bukan project holding yang sedang aktif. Aktifkan dan pindah ke project ini?</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                      <i class="ti ti-check me-1"></i> Ya, Aktifkan
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -759,6 +785,11 @@
       const activityInput = document.querySelector('#activity-name');
       const vendorInput = document.querySelector('#vendor-name');
       const amountInput = document.querySelector('#amount');
+      const amountDisplayInput = document.querySelector('#amount-display');
+      const amountCurrencyInput = document.querySelector('#amount-currency');
+      const amountExchangeRateInput = document.querySelector('#amount-exchange-rate');
+      const amountCurrencySwitch = document.querySelector('#amount-currency-switch');
+      const amountHelper = document.querySelector('#amount-helper');
       const receiptCodeInput = document.querySelector('#receipt-code');
       const receiptTotalInput = document.querySelector('#receipt-total');
       const paymentNumberInput = document.querySelector('#payment-number');
@@ -1043,7 +1074,7 @@
 
       if (allocationAddRow) {
         allocationAddRow.addEventListener('click', createAllocationRow);
-        amountInput.addEventListener('input', updateAllocationSummary);
+        amountDisplayInput.addEventListener('input', updateAllocationSummary);
       }
 
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -1059,24 +1090,166 @@
       const terminCurrencySwitch = document.querySelector('#termin-currency-switch');
       const dollarFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
       let terminCurrency = 'IDR';
-      let usdToIdrRate = null;
+      let usdToIdrRate = Number(amountExchangeRateInput.value) || null;
 
-      function formatCurrency(value) {
-        return 'Rp ' + rupiahFormatter.format(Number(value || 0));
+      function numericValue(value) {
+        const amount = Number(value);
+
+        return Number.isFinite(amount) ? amount : 0;
       }
 
-      function formatTerminCurrency(value) {
-        const amount = Number(value || 0);
+      function hasPositiveAmount(value) {
+        return numericValue(value) > 0;
+      }
 
-        if (terminCurrency !== 'USD') {
-          return formatCurrency(amount);
-        }
+      function formatCurrency(value) {
+        return 'Rp ' + rupiahFormatter.format(numericValue(value));
+      }
 
-        if (!usdToIdrRate) {
+      function formatUsd(value) {
+        if (value === null || value === undefined) {
           return 'USD -';
         }
 
-        return 'USD ' + dollarFormatter.format(amount / usdToIdrRate);
+        return 'USD ' + dollarFormatter.format(numericValue(value));
+      }
+
+      function amountCurrency() {
+        return amountCurrencyInput.value || 'IDR';
+      }
+
+      function amountAsIdr() {
+        const displayAmount = numericValue(amountDisplayInput.value);
+
+        if (amountCurrency() !== 'USD') {
+          return Math.round(displayAmount);
+        }
+
+        if (displayAmount === 0) {
+          return 0;
+        }
+
+        if (!usdToIdrRate) {
+          return null;
+        }
+
+        return Math.round(displayAmount * usdToIdrRate);
+      }
+
+      function syncAmountInput() {
+        const idrAmount = amountAsIdr();
+
+        amountInput.value = idrAmount === null ? '' : idrAmount;
+        amountExchangeRateInput.value = amountCurrency() === 'USD' && usdToIdrRate ? usdToIdrRate : '';
+        amountDisplayInput.step = amountCurrency() === 'USD' ? '0.01' : '1';
+        amountHelper.classList.remove('text-danger');
+
+        amountCurrencySwitch.querySelectorAll('button').forEach(function (button) {
+          button.classList.toggle('is-active', button.dataset.currency === amountCurrency());
+        });
+
+        if (amountCurrency() === 'USD') {
+          amountHelper.textContent = idrAmount === null
+            ? 'Menunggu kurs USD...'
+            : 'Setara ' + formatCurrency(idrAmount);
+        } else {
+          amountHelper.textContent = '';
+        }
+      }
+
+      function setAmountCurrency(currency) {
+        const previousCurrency = amountCurrency();
+        const currentIdrAmount = amountAsIdr();
+
+        amountCurrencyInput.value = currency;
+
+        if (previousCurrency !== currency && currentIdrAmount !== null) {
+          if (currency === 'USD') {
+            amountDisplayInput.value = usdToIdrRate ? Number(currentIdrAmount / usdToIdrRate).toFixed(2) : '';
+          } else {
+            amountDisplayInput.value = currentIdrAmount;
+          }
+        }
+
+        syncAmountInput();
+        updateAllocationSummary();
+        updateSummary();
+      }
+
+      function convertedUsd(value) {
+        if (numericValue(value) === 0) {
+          return 0;
+        }
+
+        if (!usdToIdrRate) {
+          return null;
+        }
+
+        return numericValue(value) / usdToIdrRate;
+      }
+
+      function idrOfferForDisplay(info) {
+        if (hasPositiveAmount(info.offer)) {
+          return numericValue(info.offer);
+        }
+
+        if (hasPositiveAmount(info.offer_usd) && usdToIdrRate) {
+          return numericValue(info.offer_usd) * usdToIdrRate;
+        }
+
+        return 0;
+      }
+
+      function usdOfferForDisplay(info) {
+        if (hasPositiveAmount(info.offer_usd)) {
+          return numericValue(info.offer_usd);
+        }
+
+        return convertedUsd(info.offer);
+      }
+
+      function paidForDisplay(info) {
+        if (terminCurrency !== 'USD') {
+          return numericValue(info.paid);
+        }
+
+        return convertedUsd(info.paid);
+      }
+
+      function remainingForDisplay(info) {
+        if (terminCurrency !== 'USD') {
+          return numericValue(info.remaining);
+        }
+
+        if (hasPositiveAmount(info.offer_usd)) {
+          const paidUsd = convertedUsd(info.paid);
+
+          return paidUsd === null ? numericValue(info.offer_usd) : numericValue(info.offer_usd) - paidUsd;
+        }
+
+        return convertedUsd(info.remaining);
+      }
+
+      function formatTerminCurrency(value) {
+        return terminCurrency === 'USD' ? formatUsd(value) : formatCurrency(value);
+      }
+
+      function setTerminCurrency(currency) {
+        terminCurrency = currency;
+
+        if (!terminCurrencySwitch) {
+          return;
+        }
+
+        terminCurrencySwitch.querySelectorAll('button').forEach(function (item) {
+          item.classList.toggle('is-active', item.dataset.currency === currency);
+        });
+      }
+
+      function syncTerminCurrencyForInfo(info) {
+        if (!hasPositiveAmount(info.offer) && hasPositiveAmount(info.offer_usd)) {
+          setTerminCurrency('USD');
+        }
       }
 
       async function fetchUsdRate() {
@@ -1087,6 +1260,7 @@
 
           if (rate > 0) {
             usdToIdrRate = rate;
+            syncAmountInput();
             updateTerminInfo();
           }
         } catch (error) {
@@ -1155,25 +1329,31 @@
         if (terminTitle) {
           const terms = info.terms || [];
 
+          syncTerminCurrencyForInfo(info);
+
+          const offerDisplay = terminCurrency === 'USD' ? usdOfferForDisplay(info) : idrOfferForDisplay(info);
+          const paidDisplay = paidForDisplay(info);
+          const remainingDisplay = remainingForDisplay(info);
+
           terminTitle.textContent = selectedText(activityInput) || '-';
-          terminOffer.textContent = formatTerminCurrency(info.offer);
-          terminPaid.textContent = formatTerminCurrency(info.paid);
-          terminRemaining.textContent = formatTerminCurrency(info.remaining);
-          terminRemaining.classList.toggle('text-danger', Number(info.remaining) < 0);
-          terminRemaining.classList.toggle('text-primary', Number(info.remaining) >= 0);
+          terminOffer.textContent = formatTerminCurrency(offerDisplay);
+          terminPaid.textContent = formatTerminCurrency(paidDisplay);
+          terminRemaining.textContent = formatTerminCurrency(remainingDisplay);
+          terminRemaining.classList.toggle('text-danger', remainingDisplay !== null && numericValue(remainingDisplay) < 0);
+          terminRemaining.classList.toggle('text-primary', remainingDisplay === null || numericValue(remainingDisplay) >= 0);
 
           terminHistory.innerHTML = '';
           terms.forEach(function (term) {
             const option = document.createElement('option');
             option.value = term.number;
-            option.textContent = 'Pembayaran ke-' + term.number + ' · ' + formatTerminCurrency(term.amount);
+            option.textContent = 'Pembayaran ke-' + term.number + ' - ' + formatTerminCurrency(terminCurrency === 'USD' ? convertedUsd(term.amount) : term.amount);
             terminHistory.appendChild(option);
           });
 
           if (Number(info.remaining || 0) > 0 || terms.length === 0) {
             const upcomingOption = document.createElement('option');
             upcomingOption.value = nextPaymentNumber;
-            upcomingOption.textContent = 'Pembayaran ke-' + nextPaymentNumber + ' · Belum dibayar';
+            upcomingOption.textContent = 'Pembayaran ke-' + nextPaymentNumber + ' - Belum dibayar';
             terminHistory.appendChild(upcomingOption);
             terminHistory.value = nextPaymentNumber;
           } else {
@@ -1210,11 +1390,7 @@
       if (terminCurrencySwitch) {
         terminCurrencySwitch.querySelectorAll('button').forEach(function (button) {
           button.addEventListener('click', function () {
-            terminCurrency = button.dataset.currency || 'IDR';
-
-            terminCurrencySwitch.querySelectorAll('button').forEach(function (item) {
-              item.classList.toggle('is-active', item === button);
-            });
+            setTerminCurrency(button.dataset.currency || 'IDR');
 
             if (terminCurrency === 'USD' && !usdToIdrRate) {
               fetchUsdRate();
@@ -1247,11 +1423,14 @@
       function updateSummary() {
         const receiptLabel = receiptCodeInput.value.trim() || 'Kuitansi';
         const paymentLabel = receiptLabel + ' - ' + (paymentNumberInput.value || 1) + '/' + (paymentTotalInput.value || 1);
+        const summaryAmount = amountCurrency() === 'USD'
+          ? formatUsd(amountDisplayInput.value) + ' (' + formatCurrency(amountInput.value) + ')'
+          : formatCurrency(amountInput.value);
 
         document.querySelector('#summary-project-holding').textContent = selectedText(projectHoldingInput) || 'Belum tersedia';
         document.querySelector('#summary-name').textContent = selectedText(activityInput) || 'Belum tersedia';
         document.querySelector('#summary-vendor').textContent = selectedText(vendorInput) || '-';
-        document.querySelector('#summary-amount').textContent = formatCurrency(amountInput.value);
+        document.querySelector('#summary-amount').textContent = summaryAmount;
         document.querySelector('#summary-date').textContent = dateInput.value ? selectedDayName() + ', ' + dateInput.value : '-';
         document.querySelector('#summary-payment').textContent = paymentLabel;
       }
@@ -1373,13 +1552,33 @@
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedFile.size);
       }
 
-      [dateInput, projectHoldingInput, vendorInput, amountInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
+      [dateInput, projectHoldingInput, vendorInput, amountDisplayInput, receiptCodeInput, paymentNumberInput, paymentTotalInput].forEach(function (input) {
         input.addEventListener('input', function () {
+          if (input === amountDisplayInput) {
+            syncAmountInput();
+            updateAllocationSummary();
+          }
+
           updateSummary();
         });
 
         input.addEventListener('change', function () {
+          if (input === amountDisplayInput) {
+            syncAmountInput();
+            updateAllocationSummary();
+          }
+
           updateSummary();
+        });
+      });
+
+      amountCurrencySwitch.querySelectorAll('button').forEach(function (button) {
+        button.addEventListener('click', function () {
+          setAmountCurrency(button.dataset.currency || 'IDR');
+
+          if (amountCurrency() === 'USD' && !usdToIdrRate) {
+            fetchUsdRate();
+          }
         });
       });
 
@@ -1406,6 +1605,16 @@
       });
 
       form.addEventListener('submit', function (event) {
+        syncAmountInput();
+
+        if (amountCurrency() === 'USD' && !amountInput.value) {
+          event.preventDefault();
+          amountHelper.textContent = 'Kurs USD belum tersedia. Coba lagi sebentar.';
+          amountHelper.classList.add('text-danger');
+          amountDisplayInput.focus();
+          return;
+        }
+
         if (!activityInput.value) {
           event.preventDefault();
           const searchInput = activityInput.closest('.searchable-select').querySelector('[data-role="search-input"]');
@@ -1429,6 +1638,7 @@
         setTimeout(function () {
           receiptPreview.classList.remove('is-visible');
           draftStatus.classList.add('d-none');
+          syncAmountInput();
           updateTerminInfo();
           searchableSelectSyncs.forEach(function (sync) {
             sync();
@@ -1440,6 +1650,12 @@
           }
         });
       });
+
+      syncAmountInput();
+
+      if (amountCurrency() === 'USD' && !usdToIdrRate) {
+        fetchUsdRate();
+      }
 
       updateTerminInfo();
     });
