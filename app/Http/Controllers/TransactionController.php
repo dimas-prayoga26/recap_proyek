@@ -35,6 +35,8 @@ class TransactionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->normalizeTransactionAmounts($request);
+
         $validated = $request->validate([
             'type' => ['required', Rule::in(['masuk', 'keluar'])],
             'project_id' => ['required', 'exists:projects,id'],
@@ -42,6 +44,9 @@ class TransactionController extends Controller
             'work_item_id' => ['required', 'exists:work_items,id'],
             'vendor_id' => ['nullable', 'exists:vendors,id'],
             'amount' => ['required', 'integer', 'min:0'],
+            'amount_display' => ['nullable', 'string', 'max:255'],
+            'amount_currency' => ['nullable', Rule::in(['IDR', 'USD'])],
+            'amount_exchange_rate' => ['nullable', 'numeric', 'min:0'],
             'recorded_at' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
             'payment_group_code' => ['nullable', 'string', 'max:255'],
@@ -336,6 +341,92 @@ class TransactionController extends Controller
         $paid = (int) $paymentGroup->terms()->sum('amount');
 
         return $offer - $paid;
+    }
+
+    private function normalizeTransactionAmounts(Request $request): void
+    {
+        $request->merge([
+            'amount_display' => $request->input('amount_display'),
+            'amount_currency' => strtoupper((string) $request->input('amount_currency', 'IDR')),
+            'amount_exchange_rate' => $this->normalizeDecimalInput($request->input('amount_exchange_rate')),
+            'amount' => $this->normalizedTransactionAmount($request),
+            'receipt_total' => $this->normalizeIntegerInput($request->input('receipt_total')),
+        ]);
+    }
+
+    private function normalizedTransactionAmount(Request $request): ?int
+    {
+        $currency = strtoupper((string) $request->input('amount_currency', 'IDR'));
+        $displayAmount = $this->normalizeDecimalInput($request->input('amount_display'));
+
+        if ($currency !== 'USD') {
+            return $this->normalizeIntegerInput($displayAmount ?? $request->input('amount'));
+        }
+
+        $exchangeRate = $this->normalizeDecimalInput($request->input('amount_exchange_rate'));
+
+        if ($displayAmount === null || $exchangeRate === null) {
+            return null;
+        }
+
+        return (int) round((float) $displayAmount * (float) $exchangeRate);
+    }
+
+    private function normalizeIntegerInput(mixed $value): ?int
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', $value);
+
+        return $digits === '' ? null : (int) $digits;
+    }
+
+    private function normalizeDecimalInput(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $value = preg_replace('/[^\d,.]/', '', $value) ?? '';
+
+        if ($value === '') {
+            return null;
+        }
+
+        $lastComma = strrpos($value, ',');
+        $lastDot = strrpos($value, '.');
+        $decimalSeparator = false;
+
+        if ($lastComma !== false && $lastDot !== false) {
+            $decimalSeparator = $lastComma > $lastDot ? ',' : '.';
+        } elseif ($lastComma !== false) {
+            $decimalSeparator = strlen($value) - $lastComma <= 3 ? ',' : false;
+        } elseif ($lastDot !== false) {
+            $decimalSeparator = strlen($value) - $lastDot <= 3 ? '.' : false;
+        }
+
+        if ($decimalSeparator === false) {
+            $normalized = preg_replace('/\D/', '', $value);
+
+            return $normalized === '' ? null : $normalized;
+        }
+
+        $parts = explode($decimalSeparator, $value);
+        $decimal = array_pop($parts);
+        $integer = preg_replace('/\D/', '', implode('', $parts));
+        $decimal = preg_replace('/\D/', '', $decimal);
+
+        if ($integer === '' && $decimal === '') {
+            return null;
+        }
+
+        return ($integer === '' ? '0' : $integer).($decimal === '' ? '' : '.'.$decimal);
     }
 
     private function workItemTerminInfo(Collection $workItems): array

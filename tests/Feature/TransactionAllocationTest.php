@@ -51,6 +51,44 @@ class TransactionAllocationTest extends TestCase
             });
     }
 
+    public function test_expense_transaction_accepts_formatted_usd_amount_input(): void
+    {
+        $project = Project::create([
+            'name' => 'Project USD Amount Test',
+            'slug' => 'project-usd-amount-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::firstOrCreate(['name' => 'Vendor USD Amount']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Bayar USD',
+            'offer_rupiah' => 50000000,
+            'offer_usd' => 3000,
+        ]);
+
+        $response = $this->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'amount_display' => '1,250.50',
+            'amount_currency' => 'USD',
+            'amount_exchange_rate' => '16.000',
+            'recorded_at' => '2026-09-01',
+            'payment_number' => 1,
+        ]);
+
+        $response->assertRedirect(route('uang-keluar.index'));
+
+        $this->assertSame(20008000, ProjectTransaction::query()->latest('id')->value('amount'));
+    }
+
     public function test_expense_transaction_can_allocate_overpayment_to_another_work_item(): void
     {
         $project = Project::create([

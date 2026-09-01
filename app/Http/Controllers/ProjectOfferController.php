@@ -92,6 +92,8 @@ class ProjectOfferController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->normalizeOfferAmounts($request);
+
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'pekerjaan' => ['required', 'string', 'max:255'],
@@ -178,6 +180,8 @@ class ProjectOfferController extends Controller
 
     public function update(Request $request, ProjectOffer $projectOffer): RedirectResponse
     {
+        $this->normalizeOfferAmounts($request);
+
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'pekerjaan' => ['required', 'string', 'max:255'],
@@ -288,6 +292,71 @@ class ProjectOfferController extends Controller
         return $workItem->transactions()->exists()
             || $workItem->paymentGroups()->whereHas('terms')->exists()
             || ProjectTransactionAllocation::query()->where('work_item_id', $workItem->id)->exists();
+    }
+
+    private function normalizeOfferAmounts(Request $request): void
+    {
+        $request->merge([
+            'penawaran_usd' => $this->normalizeDecimalInput($request->input('penawaran_usd')),
+            'penawaran_rupiah' => $this->normalizeIntegerInput($request->input('penawaran_rupiah')),
+        ]);
+    }
+
+    private function normalizeIntegerInput(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', $value);
+
+        return $digits === '' ? null : $digits;
+    }
+
+    private function normalizeDecimalInput(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $value = preg_replace('/[^\d,.]/', '', $value) ?? '';
+
+        if ($value === '') {
+            return null;
+        }
+
+        $lastComma = strrpos($value, ',');
+        $lastDot = strrpos($value, '.');
+        $decimalSeparator = false;
+
+        if ($lastComma !== false && $lastDot !== false) {
+            $decimalSeparator = $lastComma > $lastDot ? ',' : '.';
+        } elseif ($lastComma !== false) {
+            $decimalSeparator = strlen($value) - $lastComma <= 3 ? ',' : false;
+        } elseif ($lastDot !== false) {
+            $decimalSeparator = strlen($value) - $lastDot <= 3 ? '.' : false;
+        }
+
+        if ($decimalSeparator === false) {
+            $normalized = preg_replace('/\D/', '', $value);
+
+            return $normalized === '' ? null : $normalized;
+        }
+
+        $parts = explode($decimalSeparator, $value);
+        $decimal = array_pop($parts);
+        $integer = preg_replace('/\D/', '', implode('', $parts));
+        $decimal = preg_replace('/\D/', '', $decimal);
+
+        if ($integer === '' && $decimal === '') {
+            return null;
+        }
+
+        return ($integer === '' ? '0' : $integer).($decimal === '' ? '' : '.'.$decimal);
     }
 
     /**

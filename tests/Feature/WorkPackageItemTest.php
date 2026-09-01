@@ -45,6 +45,34 @@ class WorkPackageItemTest extends TestCase
         ]);
     }
 
+    public function test_regular_offer_accepts_formatted_currency_values(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Format Nilai Test',
+            'slug' => 'project-format-nilai-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+
+        $response = $this->post(route('kategori-pekerjaan.store'), [
+            'pekerjaan' => 'Pekerjaan Format Nilai',
+            'penawaran_usd' => '1,250.50',
+            'penawaran_rupiah' => '651.114.046',
+        ]);
+
+        $response->assertRedirect(route('kategori-pekerjaan.index', ['project_id' => $project->id]));
+
+        $this->assertDatabaseHas('project_offers', [
+            'project_id' => $project->id,
+            'pekerjaan' => 'Pekerjaan Format Nilai',
+            'penawaran_usd' => 1250.50,
+            'penawaran_rupiah' => 651114046,
+        ]);
+    }
+
     public function test_package_offer_stores_child_items_in_their_own_table(): void
     {
         $project = Project::create([

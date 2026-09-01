@@ -358,7 +358,7 @@
                   <label for="offer-usd" class="form-label">Penawaran USD</label>
                   <div class="input-group">
                     <span class="input-group-text">USD</span>
-                    <input type="number" class="form-control @error('penawaran_usd') is-invalid @enderror" id="offer-usd" name="penawaran_usd" value="{{ old('penawaran_usd') }}" min="0" step="0.01" placeholder="0" />
+                    <input type="text" class="form-control @error('penawaran_usd') is-invalid @enderror" id="offer-usd" name="penawaran_usd" value="{{ old('penawaran_usd') }}" inputmode="decimal" autocomplete="off" placeholder="0.00" />
                     @error('penawaran_usd')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -370,7 +370,7 @@
                   <label for="offer-idr" class="form-label">Penawaran Rupiah</label>
                   <div class="input-group">
                     <span class="input-group-text">Rp</span>
-                    <input type="number" class="form-control @error('penawaran_rupiah') is-invalid @enderror" id="offer-idr" name="penawaran_rupiah" value="{{ old('penawaran_rupiah') }}" min="0" step="1000" placeholder="0" />
+                    <input type="text" class="form-control @error('penawaran_rupiah') is-invalid @enderror" id="offer-idr" name="penawaran_rupiah" value="{{ old('penawaran_rupiah') }}" inputmode="numeric" autocomplete="off" placeholder="0" />
                     @error('penawaran_rupiah')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -802,12 +802,81 @@
         }
       }
 
+      function normalizeIdrInputValue(value) {
+        return String(value || '').replace(/\D/g, '');
+      }
+
+      function normalizeUsdInputValue(value) {
+        const cleaned = String(value || '').replace(/[^\d,.]/g, '');
+
+        if (cleaned === '') {
+          return '';
+        }
+
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+        let decimalSeparator = '';
+
+        if (lastComma !== -1 && lastDot !== -1) {
+          decimalSeparator = lastComma > lastDot ? ',' : '.';
+        } else if (lastComma !== -1) {
+          decimalSeparator = cleaned.length - lastComma <= 3 ? ',' : '';
+        } else if (lastDot !== -1) {
+          decimalSeparator = cleaned.length - lastDot <= 3 ? '.' : '';
+        }
+
+        if (decimalSeparator === '') {
+          return cleaned.replace(/\D/g, '');
+        }
+
+        const parts = cleaned.split(decimalSeparator);
+        const decimal = parts.pop().replace(/\D/g, '').slice(0, 2);
+        const integer = parts.join('').replace(/\D/g, '') || '0';
+
+        return integer + (cleaned.endsWith(decimalSeparator) ? '.' : (decimal !== '' ? '.' + decimal : ''));
+      }
+
+      function formatIdrInputValue(value) {
+        const digits = normalizeIdrInputValue(value);
+
+        return digits === '' ? '' : idrFormatter.format(Number(digits));
+      }
+
+      function formatUsdInputValue(value) {
+        const normalized = normalizeUsdInputValue(value);
+
+        if (normalized === '') {
+          return '';
+        }
+
+        const hasTrailingDecimal = normalized.endsWith('.');
+        const parts = normalized.split('.');
+        const integer = parts[0] === '' ? '0' : usdFormatter.format(Number(parts[0]));
+        const decimal = parts[1] || '';
+
+        return integer + (hasTrailingDecimal ? '.' : (decimal !== '' ? '.' + decimal : ''));
+      }
+
+      function formatOfferCurrencyInputs() {
+        usdInput.value = formatUsdInputValue(usdInput.value);
+        idrInput.value = formatIdrInputValue(idrInput.value);
+      }
+
+      function normalizeOfferCurrencyInputs() {
+        usdInput.value = normalizeUsdInputValue(usdInput.value);
+        idrInput.value = normalizeIdrInputValue(idrInput.value);
+      }
+
       function formatIdr(value) {
-        return Number(value || 0) > 0 ? 'Rp ' + idrFormatter.format(Number(value)) : '-';
+        const amount = Number(normalizeIdrInputValue(value) || 0);
+
+        return amount > 0 ? 'Rp ' + idrFormatter.format(amount) : '-';
       }
 
       function formatUsd(value) {
-        return Number(value || 0) > 0 ? 'USD ' + usdFormatter.format(Number(value)) : '-';
+        const amount = Number(normalizeUsdInputValue(value) || 0);
+
+        return amount > 0 ? 'USD ' + usdFormatter.format(amount) : '-';
       }
 
       function selectedVendorName() {
@@ -834,7 +903,17 @@
         document.querySelector('#summary-idr').textContent = formatIdr(idrInput.value);
       }
 
-      [workInput, usdInput, idrInput].forEach(function (input) {
+      usdInput.addEventListener('input', function () {
+        usdInput.value = formatUsdInputValue(usdInput.value);
+        updateSummary();
+      });
+
+      idrInput.addEventListener('input', function () {
+        idrInput.value = formatIdrInputValue(idrInput.value);
+        updateSummary();
+      });
+
+      [workInput].forEach(function (input) {
         input.addEventListener('input', updateSummary);
       });
 
@@ -849,6 +928,8 @@
       });
 
       form.addEventListener('submit', function (event) {
+        normalizeOfferCurrencyInputs();
+
         if (!packageToggle.checked) {
           return;
         }
@@ -908,6 +989,7 @@
         usdInput.value = data.usd || '';
         idrInput.value = data.rupiah || '';
         notesInput.value = data.catatan || '';
+        formatOfferCurrencyInputs();
 
         if (packageEntries) {
           packageToggle.checked = true;
@@ -959,10 +1041,12 @@
           togglePackageMode(false);
           refreshPackageRowNames();
           vendorSearchableSelect.sync();
+          formatOfferCurrencyInputs();
           updateSummary();
         });
       });
 
+      formatOfferCurrencyInputs();
       updateSummary();
     });
   </script>

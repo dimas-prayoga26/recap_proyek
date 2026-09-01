@@ -576,7 +576,7 @@
                       <button type="button" data-currency="IDR" @class(['is-active' => old('amount_currency', 'IDR') !== 'USD'])>Rp</button>
                       <button type="button" data-currency="USD" @class(['is-active' => old('amount_currency') === 'USD'])>USD</button>
                     </span>
-                    <input type="number" class="form-control @error('amount') is-invalid @enderror" id="amount-display" name="amount_display" min="0" step="{{ old('amount_currency') === 'USD' ? '0.01' : '1' }}" placeholder="0" value="{{ old('amount_display', old('amount')) }}" required />
+                    <input type="text" class="form-control @error('amount') is-invalid @enderror" id="amount-display" name="amount_display" inputmode="decimal" autocomplete="off" placeholder="0" value="{{ old('amount_display', old('amount')) }}" required />
                     @error('amount')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -1098,12 +1098,79 @@
         return Number.isFinite(amount) ? amount : 0;
       }
 
+      function normalizeIdrInputValue(value) {
+        return String(value || '').replace(/\D/g, '');
+      }
+
+      function normalizeUsdInputValue(value) {
+        const cleaned = String(value || '').replace(/[^\d,.]/g, '');
+
+        if (cleaned === '') {
+          return '';
+        }
+
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+        let decimalSeparator = '';
+
+        if (lastComma !== -1 && lastDot !== -1) {
+          decimalSeparator = lastComma > lastDot ? ',' : '.';
+        } else if (lastComma !== -1) {
+          decimalSeparator = cleaned.length - lastComma <= 3 ? ',' : '';
+        } else if (lastDot !== -1) {
+          decimalSeparator = cleaned.length - lastDot <= 3 ? '.' : '';
+        }
+
+        if (decimalSeparator === '') {
+          return cleaned.replace(/\D/g, '');
+        }
+
+        const parts = cleaned.split(decimalSeparator);
+        const decimal = parts.pop().replace(/\D/g, '').slice(0, 2);
+        const integer = parts.join('').replace(/\D/g, '') || '0';
+
+        return integer + (cleaned.endsWith(decimalSeparator) ? '.' : (decimal !== '' ? '.' + decimal : ''));
+      }
+
+      function formatIdrInputValue(value) {
+        const digits = normalizeIdrInputValue(value);
+
+        return digits === '' ? '' : rupiahFormatter.format(Number(digits));
+      }
+
+      function formatUsdInputValue(value) {
+        const normalized = normalizeUsdInputValue(value);
+
+        if (normalized === '') {
+          return '';
+        }
+
+        const hasTrailingDecimal = normalized.endsWith('.');
+        const parts = normalized.split('.');
+        const integer = parts[0] === '' ? '0' : dollarFormatter.format(Number(parts[0]));
+        const decimal = parts[1] || '';
+
+        return integer + (hasTrailingDecimal ? '.' : (decimal !== '' ? '.' + decimal : ''));
+      }
+
+      function numericCurrencyValue(value, currency) {
+        if (typeof value !== 'string') {
+          return numericValue(value);
+        }
+
+        if (currency === 'USD') {
+          return Number(normalizeUsdInputValue(value) || 0);
+        }
+
+        return Number(normalizeIdrInputValue(value) || 0);
+      }
+
       function hasPositiveAmount(value) {
         return numericValue(value) > 0;
       }
 
       function formatCurrency(value) {
-        return 'Rp ' + rupiahFormatter.format(numericValue(value));
+        return 'Rp ' + rupiahFormatter.format(numericCurrencyValue(value, 'IDR'));
       }
 
       function formatUsd(value) {
@@ -1111,7 +1178,7 @@
           return 'USD -';
         }
 
-        return 'USD ' + dollarFormatter.format(numericValue(value));
+        return 'USD ' + dollarFormatter.format(numericCurrencyValue(value, 'USD'));
       }
 
       function amountCurrency() {
@@ -1119,11 +1186,11 @@
       }
 
       function amountAsIdr() {
-        const displayAmount = numericValue(amountDisplayInput.value);
-
         if (amountCurrency() !== 'USD') {
-          return Math.round(displayAmount);
+          return Math.round(numericCurrencyValue(amountDisplayInput.value, 'IDR'));
         }
+
+        const displayAmount = numericCurrencyValue(amountDisplayInput.value, 'USD');
 
         if (displayAmount === 0) {
           return 0;
@@ -1141,7 +1208,10 @@
 
         amountInput.value = idrAmount === null ? '' : idrAmount;
         amountExchangeRateInput.value = amountCurrency() === 'USD' && usdToIdrRate ? usdToIdrRate : '';
-        amountDisplayInput.step = amountCurrency() === 'USD' ? '0.01' : '1';
+        amountDisplayInput.value = amountCurrency() === 'USD'
+          ? formatUsdInputValue(amountDisplayInput.value)
+          : formatIdrInputValue(amountDisplayInput.value);
+        amountDisplayInput.placeholder = amountCurrency() === 'USD' ? '0.00' : '0';
         amountHelper.classList.remove('text-danger');
 
         amountCurrencySwitch.querySelectorAll('button').forEach(function (button) {
