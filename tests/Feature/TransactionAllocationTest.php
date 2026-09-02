@@ -12,6 +12,7 @@ use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
@@ -47,6 +48,15 @@ class TransactionAllocationTest extends TestCase
             ->assertSee('name="amount_display"', false)
             ->assertSee('data-currency="USD"', false)
             ->assertSee('Kurs sekarang USD Rp 17.000')
+            ->assertSee('JPG, PNG, PDF maksimal 5MB')
+            ->assertSee('accept="image/jpeg,image/jpg,image/png,application/pdf,.pdf"', false)
+            ->assertSee('is-dragover')
+            ->assertSee('id="receipt-remove"', false)
+            ->assertSee('<i class="ti ti-x"></i>', false)
+            ->assertSee('clearReceiptFile')
+            ->assertDontSee('Asli ')
+            ->assertDontSee('| Resize')
+            ->assertDontSee('WEBP')
             ->assertViewHas('workItemTerminInfo', function (array $workItemTerminInfo) use ($workItem): bool {
                 return isset($workItemTerminInfo[$workItem->id])
                     && $workItemTerminInfo[$workItem->id]['offer'] === 0
@@ -204,6 +214,44 @@ class TransactionAllocationTest extends TestCase
             'project_id' => $project->id,
             'work_item_id' => $workItem->id,
             'amount' => 0,
+        ]);
+    }
+
+    public function test_transaction_receipt_rejects_webp_upload(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Webp Receipt Test',
+            'slug' => 'project-webp-receipt-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::firstOrCreate(['name' => 'Vendor Webp Receipt']);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Bukti Webp',
+            'offer_rupiah' => 50000000,
+        ]);
+
+        $response = $this->from(route('uang-keluar.index'))->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'amount' => 10000000,
+            'recorded_at' => '2026-09-02',
+            'payment_number' => 1,
+            'receipt_total' => 50000000,
+            'receipt' => UploadedFile::fake()->create('receipt.webp', 10, 'image/webp'),
+        ]);
+
+        $response
+            ->assertRedirect(route('uang-keluar.index'))
+            ->assertSessionHasErrors('receipt');
+
+        $this->assertDatabaseMissing('project_transactions', [
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'amount' => 10000000,
         ]);
     }
 

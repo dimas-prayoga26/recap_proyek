@@ -361,12 +361,18 @@
       transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .receipt-upload:hover {
+    .receipt-upload:hover,
+    .receipt-upload.is-dragover {
       background:
         linear-gradient(135deg, rgba(33, 150, 243, 0.12), rgba(103, 58, 183, 0.08)),
         #ffffff;
       border-color: #2196f3;
       box-shadow: 0 8px 20px rgba(33, 150, 243, 0.12);
+    }
+
+    .receipt-upload.is-dragover {
+      border-style: solid;
+      box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.12), 0 8px 20px rgba(33, 150, 243, 0.12);
     }
 
     .receipt-upload input {
@@ -441,6 +447,7 @@
 
     .receipt-preview img {
       border-radius: 6px;
+      flex: 0 0 auto;
       height: 62px;
       object-fit: cover;
       width: 82px;
@@ -457,6 +464,36 @@
 
     .receipt-preview-file.is-visible {
       display: flex;
+    }
+
+    .receipt-preview-info {
+      min-width: 0;
+    }
+
+    .receipt-preview-info strong,
+    .receipt-preview-info span {
+      overflow-wrap: anywhere;
+    }
+
+    .receipt-remove-button {
+      align-items: center;
+      background: #fff5f5;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      color: #ef4444;
+      display: inline-flex;
+      flex: 0 0 auto;
+      height: 34px;
+      justify-content: center;
+      margin-left: auto;
+      padding: 0;
+      width: 34px;
+    }
+
+    .receipt-remove-button:hover,
+    .receipt-remove-button:focus {
+      background: #fee2e2;
+      color: #dc2626;
     }
 
     .draft-summary {
@@ -814,23 +851,25 @@
                     <i class="ti ti-cloud-upload"></i>
                   </span>
                   <strong class="d-block">Upload Bukti</strong>
-                  <span class="receipt-upload-meta">JPG, PNG, WEBP, PDF maksimal 5MB</span>
+                  <span class="receipt-upload-meta">Klik atau drag & drop file. JPG, PNG, PDF maksimal 5MB</span>
                   <span class="receipt-upload-types" aria-hidden="true">
                     <span>JPG</span>
                     <span>PNG</span>
-                    <span>WEBP</span>
                     <span>PDF</span>
                   </span>
                 </span>
-                <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.pdf" />
+                <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg,image/png,application/pdf,.pdf" />
               </label>
               <div class="receipt-preview" id="receipt-preview">
                 <img alt="Preview bukti transaksi" id="receipt-image" />
                 <span class="receipt-preview-file bg-light-danger text-danger fw-semibold" id="receipt-file-badge">PDF</span>
-                <div>
+                <div class="receipt-preview-info">
                   <strong id="receipt-name">Belum ada file</strong>
                   <span class="form-helper mb-0" id="receipt-size">-</span>
                 </div>
+                <button type="button" class="receipt-remove-button" id="receipt-remove" aria-label="Hapus file bukti" title="Hapus file">
+                  <i class="ti ti-x"></i>
+                </button>
               </div>
             </div>
 
@@ -939,13 +978,16 @@
       const receiptTotalInput = document.querySelector('#receipt-total');
       const paymentNumberInput = document.querySelector('#payment-number');
       const paymentTotalInput = document.querySelector('#payment-total');
+      const receiptUpload = document.querySelector('.receipt-upload');
       const receiptFileInput = document.querySelector('#receipt-file');
       const receiptPreview = document.querySelector('#receipt-preview');
       const receiptImage = document.querySelector('#receipt-image');
       const receiptFileBadge = document.querySelector('#receipt-file-badge');
       const receiptName = document.querySelector('#receipt-name');
       const receiptSize = document.querySelector('#receipt-size');
+      const receiptRemoveButton = document.querySelector('#receipt-remove');
       const draftStatus = document.querySelector('#draft-status');
+      let receiptPreviewUrl = null;
 
       function enhanceSearchableSelect(wrapper) {
         const select = wrapper.querySelector('[data-role="source"]');
@@ -1696,6 +1738,25 @@
         return Math.round(bytes / 1024) + ' KB';
       }
 
+      function revokeReceiptPreviewUrl() {
+        if (receiptPreviewUrl) {
+          URL.revokeObjectURL(receiptPreviewUrl);
+          receiptPreviewUrl = null;
+        }
+      }
+
+      function clearReceiptFile() {
+        receiptFileInput.value = '';
+        revokeReceiptPreviewUrl();
+        receiptPreview.classList.remove('is-visible');
+        receiptImage.removeAttribute('src');
+        receiptImage.style.display = '';
+        receiptFileBadge.classList.remove('is-visible');
+        receiptName.textContent = 'Belum ada file';
+        receiptSize.textContent = '-';
+        document.querySelector('#summary-receipt').textContent = 'Belum ada';
+      }
+
       function canvasToBlob(canvas, quality) {
         return new Promise(function (resolve) {
           canvas.toBlob(resolve, 'image/jpeg', quality);
@@ -1741,21 +1802,18 @@
         const file = receiptFileInput.files[0];
 
         if (!file) {
-          receiptPreview.classList.remove('is-visible');
-          receiptImage.removeAttribute('src');
-          receiptImage.style.display = '';
-          receiptFileBadge.classList.remove('is-visible');
-          document.querySelector('#summary-receipt').textContent = 'Belum ada';
+          clearReceiptFile();
           return;
         }
 
+        revokeReceiptPreviewUrl();
         const fileName = file.name.toLowerCase();
         const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
-        const isAllowedImage = file.type.startsWith('image/') && /\.(jpe?g|png|webp)$/i.test(file.name);
+        const isAllowedImage = file.type.startsWith('image/') && /\.(jpe?g|png)$/i.test(file.name);
 
         if (!isPdf && !isAllowedImage) {
           receiptName.textContent = 'Format harus gambar atau PDF';
-          receiptSize.textContent = 'Pilih JPG, PNG, WEBP, atau PDF';
+          receiptSize.textContent = 'Pilih JPG, PNG, atau PDF';
           receiptPreview.classList.add('is-visible');
           receiptImage.removeAttribute('src');
           receiptImage.style.display = 'none';
@@ -1779,7 +1837,7 @@
         const compressedBlob = await compressImage(file);
         const compressedFile = new File(
           [compressedBlob],
-          file.name.replace(/\.(jpg|jpeg|png|webp)$/i, '') + '.jpg',
+          file.name.replace(/\.(jpg|jpeg|png)$/i, '') + '.jpg',
           { type: 'image/jpeg', lastModified: Date.now() },
         );
 
@@ -1787,13 +1845,13 @@
         dataTransfer.items.add(compressedFile);
         receiptFileInput.files = dataTransfer.files;
 
-        const previewUrl = URL.createObjectURL(compressedFile);
+        receiptPreviewUrl = URL.createObjectURL(compressedFile);
 
-        receiptImage.src = previewUrl;
+        receiptImage.src = receiptPreviewUrl;
         receiptImage.style.display = '';
         receiptFileBadge.classList.remove('is-visible');
         receiptName.textContent = compressedFile.name;
-        receiptSize.textContent = 'Asli ' + sizeLabel(file.size) + ' | Resize ' + sizeLabel(compressedFile.size);
+        receiptSize.textContent = sizeLabel(compressedFile.size);
         document.querySelector('#summary-receipt').textContent = 'JPEG ' + sizeLabel(compressedFile.size);
       }
 
@@ -1840,6 +1898,32 @@
         updateSummary();
       });
       receiptFileInput.addEventListener('change', handleReceiptFile);
+      receiptRemoveButton.addEventListener('click', clearReceiptFile);
+
+      ['dragenter', 'dragover'].forEach(function (eventName) {
+        receiptUpload.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          receiptUpload.classList.add('is-dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(function (eventName) {
+        receiptUpload.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          receiptUpload.classList.remove('is-dragover');
+        });
+      });
+
+      receiptUpload.addEventListener('drop', function (event) {
+        if (!event.dataTransfer || event.dataTransfer.files.length === 0) {
+          return;
+        }
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(event.dataTransfer.files[0]);
+        receiptFileInput.files = dataTransfer.files;
+        handleReceiptFile();
+      });
 
       paymentTotalInput.addEventListener('input', function () {
         refreshPaymentNumberOptions(currentTerminInfo());
@@ -1889,7 +1973,7 @@
 
       form.addEventListener('reset', function () {
         setTimeout(function () {
-          receiptPreview.classList.remove('is-visible');
+          clearReceiptFile();
           draftStatus.classList.add('d-none');
           syncAmountInput();
           updateTerminInfo();

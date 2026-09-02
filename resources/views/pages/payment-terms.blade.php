@@ -108,6 +108,12 @@
       white-space: pre-wrap;
     }
 
+    .payment-detail-file {
+      align-items: center;
+      display: inline-flex;
+      gap: 8px;
+    }
+
     .vendor-search-dropdown {
       position: relative;
     }
@@ -299,8 +305,9 @@
             <div id="payment-detail-empty" class="alert alert-light-secondary mb-0">Bukti belum ada.</div>
             <img src="" id="payment-detail-image" class="img-fluid rounded d-none" alt="Bukti pembayaran" />
             <iframe src="" id="payment-detail-pdf" class="w-100 border rounded d-none" style="height: 60vh;" title="Bukti pembayaran PDF"></iframe>
-            <a href="#" id="payment-detail-download" class="btn btn-light-primary mt-3 d-none" target="_blank" rel="noopener">
-              Buka PDF
+            <a href="#" id="payment-detail-download" class="btn btn-light-primary payment-detail-file mt-3 d-none" target="_blank" rel="noopener">
+              <i class="ti ti-external-link"></i>
+              <span>Buka Bukti Pembayaran</span>
             </a>
           </div>
           <div>
@@ -367,25 +374,82 @@
       const paymentDetailImage = document.querySelector('#payment-detail-image');
       const paymentDetailPdf = document.querySelector('#payment-detail-pdf');
       const paymentDetailDownload = document.querySelector('#payment-detail-download');
+      const paymentDetailDownloadText = paymentDetailDownload.querySelector('span');
+
+      function resetPaymentReceiptPreview() {
+        paymentDetailEmpty.classList.add('d-none');
+        paymentDetailImage.classList.add('d-none');
+        paymentDetailPdf.classList.add('d-none');
+        paymentDetailDownload.classList.add('d-none');
+        paymentDetailImage.removeAttribute('src');
+        paymentDetailPdf.removeAttribute('src');
+        paymentDetailImage.dataset.receiptName = '';
+        paymentDetailImage.dataset.receiptUrl = '';
+        paymentDetailDownload.href = '#';
+      }
+
+      function showPaymentReceiptDownload(receiptName) {
+        paymentDetailDownload.classList.remove('d-none');
+        paymentDetailDownloadText.textContent = receiptName ? 'Buka ' + receiptName : 'Buka Bukti Pembayaran';
+      }
+
+      function showPaymentReceiptFallback(message, receiptName) {
+        paymentDetailImage.classList.add('d-none');
+        paymentDetailPdf.classList.add('d-none');
+        showPaymentReceiptDownload(receiptName);
+
+        if (message) {
+          paymentDetailEmpty.textContent = message;
+          paymentDetailEmpty.classList.remove('d-none');
+        }
+      }
+
+      paymentDetailImage.addEventListener('error', function () {
+        if (! paymentDetailImage.dataset.receiptUrl) {
+          return;
+        }
+
+        showPaymentReceiptFallback('Preview gambar gagal dimuat. Buka file bukti pembayaran.', paymentDetailImage.dataset.receiptName || '');
+      });
 
       document.querySelectorAll('.term-payment-button').forEach(function (button) {
         button.addEventListener('click', function () {
           const receiptUrl = button.dataset.receiptUrl || '';
-          const isPdf = button.dataset.receiptMime === 'application/pdf';
+          const receiptMime = (button.dataset.receiptMime || '').toLowerCase();
+          const receiptName = button.dataset.receiptName || '';
+          const receiptPath = (receiptUrl || receiptName).toLowerCase();
+          const isPdf = receiptMime === 'application/pdf' || receiptPath.endsWith('.pdf');
+          const isImage = receiptMime.startsWith('image/') || /\.(jpe?g|png)$/i.test(receiptPath);
 
           paymentDetailTitle.textContent = 'Pembayaran ke-' + (button.dataset.paymentNumber || '-');
           paymentDetailAmount.textContent = button.dataset.amount || '-';
           paymentDetailNotes.textContent = button.dataset.notes || '-';
+          resetPaymentReceiptPreview();
 
-          paymentDetailEmpty.classList.toggle('d-none', receiptUrl !== '');
-          paymentDetailImage.classList.toggle('d-none', !receiptUrl || isPdf);
-          paymentDetailPdf.classList.toggle('d-none', !receiptUrl || !isPdf);
-          paymentDetailDownload.classList.toggle('d-none', !receiptUrl || !isPdf);
+          if (!receiptUrl) {
+            paymentDetailEmpty.textContent = 'Bukti belum ada.';
+            paymentDetailEmpty.classList.remove('d-none');
+            return;
+          }
 
-          paymentDetailImage.src = receiptUrl && !isPdf ? receiptUrl : '';
-          paymentDetailPdf.src = receiptUrl && isPdf ? receiptUrl : '';
-          paymentDetailDownload.href = receiptUrl || '#';
-          paymentDetailDownload.textContent = button.dataset.receiptName ? 'Buka ' + button.dataset.receiptName : 'Buka PDF';
+          paymentDetailDownload.href = receiptUrl;
+
+          if (isPdf) {
+            paymentDetailPdf.src = receiptUrl;
+            paymentDetailPdf.classList.remove('d-none');
+            showPaymentReceiptDownload(receiptName);
+            return;
+          }
+
+          if (isImage) {
+            paymentDetailImage.dataset.receiptName = receiptName;
+            paymentDetailImage.dataset.receiptUrl = receiptUrl;
+            paymentDetailImage.src = receiptUrl;
+            paymentDetailImage.classList.remove('d-none');
+            return;
+          }
+
+          showPaymentReceiptFallback('Preview tidak tersedia untuk tipe file ini.', receiptName);
         });
       });
     });

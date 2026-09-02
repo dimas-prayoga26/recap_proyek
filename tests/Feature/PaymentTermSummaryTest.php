@@ -153,7 +153,7 @@ class PaymentTermSummaryTest extends TestCase
             'disk' => 'public',
             'path' => 'transaction-receipts/kwitansi-test.pdf',
             'original_name' => 'kwitansi-test.pdf',
-            'mime_type' => 'application/pdf',
+            'mime_type' => null,
             'size' => 12000,
         ]);
         ProjectTransactionAllocation::create([
@@ -177,7 +177,10 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('<i class="ti ti-eye"></i>', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
             ->assertSee('data-notes="Allocation note"', false)
+            ->assertSee('data-receipt-mime=""', false)
             ->assertSee('kwitansi-test.pdf')
+            ->assertSee('receiptPath.endsWith(\'.pdf\')', false)
+            ->assertSee('Preview gambar gagal dimuat. Buka file bukti pembayaran.')
             ->assertDontSee('data-work-name=', false)
             ->assertDontSee('data-vendor-name=', false)
             ->assertDontSee('id="payment-detail-work"', false)

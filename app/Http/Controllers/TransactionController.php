@@ -59,7 +59,7 @@ class TransactionController extends Controller
             'allocations.*.amount' => ['nullable', 'integer', 'min:1'],
             'allocations.*.payment_number' => ['nullable', 'integer', 'min:1'],
             'allocations.*.notes' => ['nullable', 'string', 'max:1000'],
-            'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ], [
             'amount.required' => 'Nominal transaksi wajib diisi.',
             'amount.integer' => 'Nominal transaksi harus berupa angka.',
