@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
+use App\Models\ProjectTransaction;
+use App\Models\ProjectTransactionAllocation;
 use App\Models\ProjectTransactionAttachment;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Carbon\CarbonInterface;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -77,6 +81,73 @@ class PaymentTermController extends Controller
         ]);
     }
 
+    public function destroy(PaymentTerm $paymentTerm): RedirectResponse
+    {
+        $activeProject = $this->activeProject();
+        $paymentTerm->loadMissing('paymentGroup');
+
+        abort_if(! $activeProject || $paymentTerm->paymentGroup?->project_id !== $activeProject->id, 404);
+
+        $attachmentsToDelete = collect();
+
+        DB::transaction(function () use ($paymentTerm, &$attachmentsToDelete): void {
+            $paymentTerm->load([
+                'paymentGroup',
+                'allocations.transaction.attachments',
+                'allocations.transaction.allocations.workItem.vendor',
+            ]);
+
+            $paymentGroup = $paymentTerm->paymentGroup;
+            $allocations = $paymentTerm->allocations;
+            $transactions = $allocations
+                ->pluck('transaction')
+                ->filter()
+                ->unique('id');
+
+            foreach ($transactions as $transaction) {
+                $allocationsForTerm = $allocations
+                    ->where('project_transaction_id', $transaction->id)
+                    ->values();
+                $remainingAllocations = $transaction->allocations
+                    ->whereNotIn('id', $allocationsForTerm->pluck('id')->all())
+                    ->values();
+
+                ProjectTransactionAllocation::query()
+                    ->whereIn('id', $allocationsForTerm->pluck('id')->all())
+                    ->delete();
+
+                if ($remainingAllocations->isEmpty()) {
+                    $attachmentsToDelete = $attachmentsToDelete->merge($this->attachmentFilesFor($transaction));
+                    $transaction->delete();
+
+                    continue;
+                }
+
+                $replacementAllocation = $remainingAllocations->first();
+
+                $transaction->forceFill([
+                    'work_item_id' => $replacementAllocation->work_item_id,
+                    'vendor_id' => $replacementAllocation->workItem?->vendor_id,
+                    'payment_group_id' => $replacementAllocation->payment_group_id,
+                    'amount' => (int) $remainingAllocations->sum('amount'),
+                    'payment_number' => $replacementAllocation->payment_number,
+                ])->save();
+            }
+
+            $paymentTerm->delete();
+
+            if ($paymentGroup) {
+                $this->refreshPaymentGroupCounters($paymentGroup);
+            }
+        });
+
+        $attachmentsToDelete->each(
+            fn (array $file): bool => Storage::disk($file['disk'])->delete($file['path']),
+        );
+
+        return back()->with('status', 'Pembayaran berhasil dihapus. Sisa pembayaran sudah dihitung ulang.');
+    }
+
     private function paymentRows(Collection $workItems): Collection
     {
         return $workItems->map(function (WorkItem $workItem) {
@@ -112,6 +183,7 @@ class PaymentTermController extends Controller
 
         return [
             'payment_number' => $term->payment_number,
+            'payment_term_id' => $term->id,
             'amount' => (int) $term->amount,
             'recorded_at' => $this->formatRecordedDate($transaction?->recorded_at ?? $term->paid_at),
             'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
@@ -128,6 +200,30 @@ class PaymentTermController extends Controller
         }
 
         return Storage::disk($attachment->disk)->url($attachment->path);
+    }
+
+    private function attachmentFilesFor(ProjectTransaction $transaction): Collection
+    {
+        return $transaction->attachments
+            ->map(fn (ProjectTransactionAttachment $attachment): array => [
+                'disk' => $attachment->disk,
+                'path' => $attachment->path,
+            ])
+            ->filter(fn (array $file): bool => filled($file['disk']) && filled($file['path']))
+            ->values();
+    }
+
+    private function refreshPaymentGroupCounters(PaymentGroup $paymentGroup): void
+    {
+        $highestPaymentNumber = (int) $paymentGroup->terms()->max('payment_number');
+        $paidAmount = (int) $paymentGroup->terms()->sum('amount');
+        $offer = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
+        $remaining = $offer - $paidAmount;
+
+        $paymentGroup->update([
+            'paid_terms' => $paymentGroup->terms()->count(),
+            'total_terms' => $this->automaticTotalTerms($remaining, $highestPaymentNumber),
+        ]);
     }
 
     private function formatRecordedDate(?CarbonInterface $date): string

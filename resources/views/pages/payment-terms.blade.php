@@ -83,6 +83,60 @@
       text-decoration: none;
     }
 
+    .term-payment-delete-button {
+      align-items: center;
+      background: #ffe8e8;
+      border: 1px solid #ffc8c8;
+      border-radius: 6px;
+      color: #ff3b30;
+      display: inline-flex;
+      font-weight: 700;
+      height: 28px;
+      justify-content: center;
+      padding: 0;
+      width: 28px;
+    }
+
+    .term-payment-delete-button:hover {
+      background: #ffdada;
+      color: #e02b20;
+    }
+
+    .payment-delete-visual {
+      align-items: center;
+      background: #fff4f4;
+      border: 1px solid #ffdada;
+      border-radius: 8px;
+      display: flex;
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .payment-delete-icon {
+      align-items: center;
+      background: #ffe1e1;
+      border-radius: 8px;
+      color: #ff3b30;
+      display: inline-flex;
+      flex: 0 0 44px;
+      font-size: 22px;
+      height: 44px;
+      justify-content: center;
+      width: 44px;
+    }
+
+    .payment-delete-summary {
+      color: #202939;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .payment-delete-helper {
+      color: #697586;
+      font-size: 13px;
+      margin: 4px 0 0;
+    }
+
     .payment-detail-line {
       align-items: flex-start;
       border-bottom: 1px solid #eef2f6;
@@ -309,6 +363,19 @@
                             >
                               <i class="ti ti-eye"></i>
                             </button>
+                            <button
+                              type="button"
+                              class="term-payment-delete-button"
+                              data-bs-toggle="modal"
+                              data-bs-target="#payment-delete-modal"
+                              data-delete-action="{{ route('termin-pembayaran.destroy', $payment['detail']['payment_term_id']) }}"
+                              data-delete-payment-number="{{ $payment['detail']['payment_number'] }}"
+                              data-delete-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                              aria-label="Hapus pembayaran ke-{{ $payment['detail']['payment_number'] }}"
+                              title="Hapus pembayaran"
+                            >
+                              <i class="ti ti-trash"></i>
+                            </button>
                           </div>
                         @else
                           -
@@ -371,6 +438,36 @@
       </div>
     </div>
   </div>
+
+  <div class="modal fade" id="payment-delete-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form method="POST" action="#" class="modal-content" id="payment-delete-form">
+        @csrf
+        @method('DELETE')
+        <div class="modal-header">
+          <h5 class="modal-title">Hapus Pembayaran</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="payment-delete-visual">
+            <span class="payment-delete-icon">
+              <i class="ti ti-trash"></i>
+            </span>
+            <div>
+              <p class="payment-delete-summary" id="payment-delete-summary">Hapus pembayaran ini?</p>
+              <p class="payment-delete-helper">Sisa pembayaran akan dihitung ulang setelah data ini dihapus.</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-danger">
+            <i class="ti ti-trash me-1"></i> Hapus Pembayaran
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 @endsection
 
 @push('scripts')
@@ -428,6 +525,8 @@
       const paymentDetailPdf = document.querySelector('#payment-detail-pdf');
       const paymentDetailDownload = document.querySelector('#payment-detail-download');
       const paymentDetailDownloadText = paymentDetailDownload.querySelector('span');
+      const paymentDeleteForm = document.querySelector('#payment-delete-form');
+      const paymentDeleteSummary = document.querySelector('#payment-delete-summary');
       let paymentDetailZoom = 1;
       let isPaymentDetailDragging = false;
       let paymentDetailDragStartX = 0;
@@ -542,6 +641,13 @@
           }
 
           showPaymentReceiptFallback('Preview tidak tersedia untuk tipe file ini.', receiptName);
+        });
+      });
+
+      document.querySelectorAll('.term-payment-delete-button').forEach(function (button) {
+        button.addEventListener('click', function () {
+          paymentDeleteForm.action = button.dataset.deleteAction || '#';
+          paymentDeleteSummary.textContent = 'Hapus pembayaran ke-' + (button.dataset.deletePaymentNumber || '-') + ' sebesar ' + (button.dataset.deleteAmount || '-') + '?';
         });
       });
 

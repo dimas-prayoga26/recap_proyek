@@ -12,6 +12,7 @@ use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PaymentTermSummaryTest extends TestCase
@@ -177,6 +178,22 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('<span>Rp 2.500.000</span>', false)
             ->assertSee('term-payment-button', false)
             ->assertSee('<i class="ti ti-eye"></i>', false)
+            ->assertSee('term-payment-delete-button', false)
+            ->assertSee('<i class="ti ti-trash"></i>', false)
+            ->assertSee('data-bs-target="#payment-delete-modal"', false)
+            ->assertSee('data-delete-action="'.route('termin-pembayaran.destroy', $paymentTerm).'"', false)
+            ->assertSee('data-delete-payment-number="1"', false)
+            ->assertSee('data-delete-amount="Rp 2.500.000"', false)
+            ->assertSee('id="payment-delete-modal"', false)
+            ->assertSee('id="payment-delete-form"', false)
+            ->assertSee('id="payment-delete-summary"', false)
+            ->assertSee('method="POST"', false)
+            ->assertSee('name="_method" value="DELETE"', false)
+            ->assertSee('Sisa pembayaran akan dihitung ulang setelah data ini dihapus.')
+            ->assertSee('paymentDeleteForm.action', false)
+            ->assertSee('paymentDeleteSummary.textContent', false)
+            ->assertDontSee('onsubmit=', false)
+            ->assertDontSee('confirm(', false)
             ->assertSee('payment-detail-preview', false)
             ->assertSee('max-height: min(58vh, 460px)', false)
             ->assertSee('Tanggal Pencatatan')
@@ -202,6 +219,135 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-work"', false)
             ->assertDontSee('id="payment-detail-vendor"', false)
             ->assertDontSee('id="payment-detail-type"', false);
+    }
+
+    public function test_payment_term_destroy_removes_last_transaction_and_recalculates_remaining(): void
+    {
+        Storage::fake('public');
+
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Hapus Pembayaran');
+        $vendor = Vendor::create(['name' => 'Vendor Hapus Pembayaran']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $workItem->update(['vendor_id' => $vendor->id]);
+        $paymentGroup = $this->paymentGroupFor($workItem, 2, payments: [1 => 25000000]);
+        $paymentTerm = $paymentGroup->terms()->firstOrFail();
+        $transaction = ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'payment_group_id' => $paymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 25000000,
+            'recorded_at' => '2026-08-29',
+            'payment_number' => 1,
+            'payment_total' => 2,
+            'receipt_total' => 80000000,
+            'notes' => 'Salah input pembayaran',
+        ]);
+        Storage::disk('public')->put('transaction-receipts/hapus-pembayaran.jpg', 'receipt');
+        $attachment = $transaction->attachments()->create([
+            'disk' => 'public',
+            'path' => 'transaction-receipts/hapus-pembayaran.jpg',
+            'original_name' => 'hapus-pembayaran.jpg',
+            'mime_type' => 'image/jpeg',
+            'size' => 12000,
+        ]);
+        $allocation = ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'payment_term_id' => $paymentTerm->id,
+            'amount' => 25000000,
+            'payment_number' => 1,
+            'role' => 'primary',
+        ]);
+
+        $response = $this
+            ->from(route('termin-pembayaran.index'))
+            ->delete(route('termin-pembayaran.destroy', $paymentTerm));
+
+        $response
+            ->assertRedirect(route('termin-pembayaran.index'))
+            ->assertSessionHas('status', 'Pembayaran berhasil dihapus. Sisa pembayaran sudah dihitung ulang.');
+
+        $this->assertDatabaseMissing('payment_terms', ['id' => $paymentTerm->id]);
+        $this->assertDatabaseMissing('project_transaction_allocations', ['id' => $allocation->id]);
+        $this->assertDatabaseMissing('project_transaction_attachments', ['id' => $attachment->id]);
+        $this->assertDatabaseMissing('project_transactions', ['id' => $transaction->id]);
+        $this->assertSame(0, $paymentGroup->refresh()->paid_terms);
+        $this->assertSame(1, $paymentGroup->total_terms);
+        Storage::disk('public')->assertMissing('transaction-receipts/hapus-pembayaran.jpg');
+    }
+
+    public function test_payment_term_destroy_reduces_transaction_when_other_allocations_remain(): void
+    {
+        [$project, $mainWorkItem] = $this->workItemForActiveProject('Pekerjaan Utama Hapus Alokasi');
+        $additionalWorkItem = $this->workItemInProject($project, 'Pekerjaan Tambahan Hapus Alokasi');
+        $vendor = Vendor::create(['name' => 'Vendor Multi Alokasi']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $mainWorkItem->update(['vendor_id' => $vendor->id]);
+        $additionalWorkItem->update(['vendor_id' => $vendor->id]);
+        $mainPaymentGroup = $this->paymentGroupFor($mainWorkItem, 2, payments: [1 => 20000000]);
+        $additionalPaymentGroup = $this->paymentGroupFor($additionalWorkItem, 2, payments: [1 => 10000000]);
+        $mainPaymentTerm = $mainPaymentGroup->terms()->firstOrFail();
+        $additionalPaymentTerm = $additionalPaymentGroup->terms()->firstOrFail();
+        $transaction = ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $mainWorkItem->id,
+            'vendor_id' => $vendor->id,
+            'payment_group_id' => $mainPaymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 30000000,
+            'recorded_at' => '2026-08-29',
+            'payment_number' => 1,
+            'payment_total' => 2,
+            'receipt_total' => 80000000,
+        ]);
+        $mainAllocation = ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $mainWorkItem->id,
+            'payment_group_id' => $mainPaymentGroup->id,
+            'payment_term_id' => $mainPaymentTerm->id,
+            'amount' => 20000000,
+            'payment_number' => 1,
+            'role' => 'primary',
+        ]);
+        $additionalAllocation = ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $additionalWorkItem->id,
+            'payment_group_id' => $additionalPaymentGroup->id,
+            'payment_term_id' => $additionalPaymentTerm->id,
+            'amount' => 10000000,
+            'payment_number' => 1,
+            'role' => 'additional',
+        ]);
+
+        $response = $this
+            ->from(route('termin-pembayaran.index'))
+            ->delete(route('termin-pembayaran.destroy', $additionalPaymentTerm));
+
+        $response->assertRedirect(route('termin-pembayaran.index'));
+
+        $this->assertDatabaseHas('project_transactions', [
+            'id' => $transaction->id,
+            'amount' => 20000000,
+            'work_item_id' => $mainWorkItem->id,
+            'payment_group_id' => $mainPaymentGroup->id,
+        ]);
+        $this->assertDatabaseHas('payment_terms', ['id' => $mainPaymentTerm->id]);
+        $this->assertDatabaseHas('project_transaction_allocations', ['id' => $mainAllocation->id]);
+        $this->assertDatabaseMissing('payment_terms', ['id' => $additionalPaymentTerm->id]);
+        $this->assertDatabaseMissing('project_transaction_allocations', ['id' => $additionalAllocation->id]);
+        $this->assertSame(0, $additionalPaymentGroup->refresh()->paid_terms);
+        $this->assertSame(1, $additionalPaymentGroup->total_terms);
     }
 
     /**
