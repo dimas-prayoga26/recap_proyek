@@ -358,7 +358,7 @@
                   <label for="offer-usd" class="form-label">Penawaran USD</label>
                   <div class="input-group">
                     <span class="input-group-text">USD</span>
-                    <input type="text" class="form-control @error('penawaran_usd') is-invalid @enderror" id="offer-usd" name="penawaran_usd" value="{{ old('penawaran_usd') }}" inputmode="decimal" autocomplete="off" placeholder="0.00" />
+                    <input type="text" class="form-control @error('penawaran_usd') is-invalid @enderror {{ $errors->has('penawaran') ? 'is-invalid' : '' }}" id="offer-usd" name="penawaran_usd" value="{{ old('penawaran_usd') }}" inputmode="decimal" autocomplete="off" placeholder="0.00" />
                     @error('penawaran_usd')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
@@ -370,12 +370,17 @@
                   <label for="offer-idr" class="form-label">Penawaran Rupiah</label>
                   <div class="input-group">
                     <span class="input-group-text">Rp</span>
-                    <input type="text" class="form-control @error('penawaran_rupiah') is-invalid @enderror" id="offer-idr" name="penawaran_rupiah" value="{{ old('penawaran_rupiah') }}" inputmode="numeric" autocomplete="off" placeholder="0" />
+                    <input type="text" class="form-control @error('penawaran_rupiah') is-invalid @enderror {{ $errors->has('penawaran') ? 'is-invalid' : '' }}" id="offer-idr" name="penawaran_rupiah" value="{{ old('penawaran_rupiah') }}" inputmode="numeric" autocomplete="off" placeholder="0" />
                     @error('penawaran_rupiah')
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                   </div>
                 </div>
+              </div>
+              <div class="col-12">
+                <span class="form-helper {{ $errors->has('penawaran') ? 'text-danger' : '' }}" id="offer-amount-message">
+                  {{ $errors->first('penawaran') }}
+                </span>
               </div>
             </div>
 
@@ -867,6 +872,25 @@
         idrInput.value = normalizeIdrInputValue(idrInput.value);
       }
 
+      function hasPositiveOfferAmount() {
+        return Number(normalizeUsdInputValue(usdInput.value) || 0) > 0
+          || Number(normalizeIdrInputValue(idrInput.value) || 0) > 0;
+      }
+
+      function syncOfferAmountValidation() {
+        const isValid = hasPositiveOfferAmount();
+        const message = document.querySelector('#offer-amount-message');
+
+        usdInput.classList.toggle('is-invalid', !isValid);
+        idrInput.classList.toggle('is-invalid', !isValid);
+        message.classList.toggle('text-danger', !isValid);
+        message.textContent = isValid
+          ? ''
+          : 'Isi Penawaran USD atau Penawaran Rupiah dengan nominal lebih dari 0.';
+
+        return isValid;
+      }
+
       function formatIdr(value) {
         const amount = Number(normalizeIdrInputValue(value) || 0);
 
@@ -905,11 +929,13 @@
 
       usdInput.addEventListener('input', function () {
         usdInput.value = formatUsdInputValue(usdInput.value);
+        syncOfferAmountValidation();
         updateSummary();
       });
 
       idrInput.addEventListener('input', function () {
         idrInput.value = formatIdrInputValue(idrInput.value);
+        syncOfferAmountValidation();
         updateSummary();
       });
 
@@ -928,9 +954,14 @@
       });
 
       form.addEventListener('submit', function (event) {
-        normalizeOfferCurrencyInputs();
+        if (!syncOfferAmountValidation()) {
+          event.preventDefault();
+          usdInput.focus();
+          return;
+        }
 
         if (!packageToggle.checked) {
+          normalizeOfferCurrencyInputs();
           return;
         }
 
@@ -950,6 +981,8 @@
           packageError.classList.remove('d-none');
           return;
         }
+
+        normalizeOfferCurrencyInputs();
       });
 
       function parsePackageNote(catatan) {

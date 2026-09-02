@@ -171,7 +171,7 @@ class VendorController extends Controller
         $vendors = $this->filteredVendorsQuery($filters)->get();
 
         $rows = array_merge(
-            [['Nama Vendor', 'Nama Kontak', 'No. Telepon', 'Catatan', 'Jumlah Pekerjaan', 'Jumlah Penawaran']],
+            [['Nama Vendor', 'Nama Kontak', 'No. Telepon', 'Catatan', 'Jumlah Pekerjaan', 'Jumlah Penawaran', 'Total Penawaran Rupiah', 'Total Penawaran USD']],
             $vendors->map(fn (Vendor $vendor): array => [
                 $vendor->name,
                 $vendor->contact_name,
@@ -179,6 +179,8 @@ class VendorController extends Controller
                 $vendor->notes,
                 $vendor->work_items_count,
                 $vendor->offers_count,
+                $vendor->total_penawaran_rupiah,
+                $vendor->total_penawaran_usd,
             ])->all(),
         );
 
@@ -205,6 +207,8 @@ class VendorController extends Controller
     {
         return Vendor::query()
             ->withCount(['workItems', 'offers'])
+            ->withSum('offers as total_penawaran_rupiah', 'penawaran_rupiah')
+            ->withSum('offers as total_penawaran_usd', 'penawaran_usd')
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'frankfurter' => [
+        'base_url' => env('FRANKFURTER_BASE_URL', 'https://api.frankfurter.dev'),
+        'usd_idr_fallback_rate' => (float) env('USD_IDR_FALLBACK_RATE', 16300),
+        'usd_idr_cache_ttl' => (int) env('USD_IDR_CACHE_TTL', 300),
+    ],
+
 ];

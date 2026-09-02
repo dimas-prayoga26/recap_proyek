@@ -90,7 +90,37 @@
       border: 1px solid #d7e9fb;
       border-radius: 8px;
       margin-bottom: 18px;
+      overflow: hidden;
       padding: 16px;
+    }
+
+    .work-termin-header {
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .work-termin-header > div:first-child {
+      min-width: 0;
+    }
+
+    .termin-rate-chip {
+      align-items: center;
+      background: #fff;
+      border: 1px solid #d7e9fb;
+      border-radius: 8px;
+      color: #364152;
+      display: inline-flex;
+      font-size: 12px;
+      font-weight: 600;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 6px 10px;
+      width: fit-content;
+    }
+
+    .termin-rate-chip i {
+      color: #2196f3;
+      font-size: 15px;
     }
 
     .work-termin-metrics {
@@ -119,18 +149,26 @@
       font-size: 18px;
       line-height: 1.25;
       margin-top: 4px;
+      overflow-wrap: anywhere;
     }
 
     .work-termin-history {
-      flex: 0 0 auto;
-      width: auto;
+      flex: 1 1 190px;
+      max-width: 260px;
+      min-width: 0;
     }
 
     .work-termin-toolbar {
       align-items: center;
       display: flex;
-      flex: 0 0 auto;
+      flex: 1 1 260px;
       gap: 8px;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    #termin-info-title {
+      overflow-wrap: anywhere;
     }
 
     .termin-currency-switch {
@@ -307,20 +345,84 @@
     }
 
     .receipt-upload {
-      border: 1px dashed #9cc8f5;
+      align-items: center;
+      background:
+        linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(103, 58, 183, 0.05)),
+        #f8fbff;
+      border: 1px dashed #64b5f6;
       border-radius: 8px;
-      background: #f8fbff;
+      color: #202939;
       display: block;
-      padding: 20px;
+      cursor: pointer;
+      min-height: 120px;
+      padding: 18px;
+      position: relative;
       text-align: center;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .receipt-upload:hover {
+      background:
+        linear-gradient(135deg, rgba(33, 150, 243, 0.12), rgba(103, 58, 183, 0.08)),
+        #ffffff;
+      border-color: #2196f3;
+      box-shadow: 0 8px 20px rgba(33, 150, 243, 0.12);
     }
 
     .receipt-upload input {
       display: none;
     }
 
-    .receipt-upload .avtar {
-      margin: 0 auto 10px;
+    .receipt-upload-content {
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+
+    .receipt-upload-icon {
+      align-items: center;
+      background: #2196f3;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(33, 150, 243, 0.24);
+      color: #fff;
+      display: flex;
+      font-size: 24px;
+      height: 52px;
+      justify-content: center;
+      margin-bottom: 10px;
+      width: 52px;
+    }
+
+    .receipt-upload strong {
+      font-size: 15px;
+    }
+
+    .receipt-upload-meta {
+      color: #697586;
+      display: block;
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .receipt-upload-types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+
+    .receipt-upload-types span {
+      background: #ffffff;
+      border: 1px solid #d9eafd;
+      border-radius: 6px;
+      color: #2196f3;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 6px 8px;
     }
 
     .receipt-preview {
@@ -405,6 +507,34 @@
 
       .work-termin-metrics {
         grid-template-columns: 1fr;
+      }
+
+      .work-termin-info {
+        padding: 12px;
+      }
+
+      .work-termin-header {
+        align-items: flex-start !important;
+      }
+
+      .work-termin-toolbar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+      }
+
+      .work-termin-history {
+        max-width: none;
+        width: 100%;
+      }
+
+      .termin-currency-switch button {
+        min-width: 36px;
+        padding: 6px 8px;
+      }
+
+      .work-termin-metric strong {
+        font-size: 16px;
       }
     }
   </style>
@@ -530,10 +660,14 @@
 
             @unless ($isIncome)
               <div class="work-termin-info" id="work-termin-info">
-                <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                <div class="work-termin-header d-flex align-items-center justify-content-between gap-3 mb-3">
                   <div>
                     <small class="text-muted">Info Termin</small>
                     <h5 class="mb-0" id="termin-info-title">-</h5>
+                    <span class="termin-rate-chip" id="termin-rate-chip">
+                      <i class="ti ti-currency-dollar"></i>
+                      Kurs sekarang USD {{ $usdToIdrRateLabel }}
+                    </span>
                   </div>
                   <div class="work-termin-toolbar">
                     <div class="termin-currency-switch" id="termin-currency-switch">
@@ -581,7 +715,9 @@
                       <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                   </div>
-                  <span class="form-helper amount-helper" id="amount-helper"></span>
+                  <span class="form-helper amount-helper {{ $errors->has('amount') ? 'text-danger' : '' }}" id="amount-helper">
+                    {{ $errors->first('amount') ?: 'Isi nominal transaksi lebih dari 0.' }}
+                  </span>
                 </div>
               </div>
               <div class="col-md-6">
@@ -673,10 +809,19 @@
             <div class="mb-4">
               <label class="form-label d-block">Bukti Transfer (Opsional)</label>
               <label class="receipt-upload" for="receipt-file">
-                <span class="avtar avtar-lg bg-light-primary">
-                  <i class="ti ti-photo-plus text-primary"></i>
+                <span class="receipt-upload-content">
+                  <span class="receipt-upload-icon">
+                    <i class="ti ti-cloud-upload"></i>
+                  </span>
+                  <strong class="d-block">Upload Bukti</strong>
+                  <span class="receipt-upload-meta">JPG, PNG, WEBP, PDF maksimal 5MB</span>
+                  <span class="receipt-upload-types" aria-hidden="true">
+                    <span>JPG</span>
+                    <span>PNG</span>
+                    <span>WEBP</span>
+                    <span>PDF</span>
+                  </span>
                 </span>
-                <strong class="d-block">Upload Bukti</strong>
                 <input type="file" id="receipt-file" name="receipt" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.pdf" />
               </label>
               <div class="receipt-preview" id="receipt-preview">
@@ -1088,9 +1233,11 @@
       const terminPaid = document.querySelector('#termin-info-paid');
       const terminRemaining = document.querySelector('#termin-info-remaining');
       const terminCurrencySwitch = document.querySelector('#termin-currency-switch');
+      const terminRateChip = document.querySelector('#termin-rate-chip');
+      const initialUsdToIdrRate = Number(@json($usdToIdrRate ?? null));
       const dollarFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
       let terminCurrency = 'IDR';
-      let usdToIdrRate = Number(amountExchangeRateInput.value) || null;
+      let usdToIdrRate = initialUsdToIdrRate || Number(amountExchangeRateInput.value) || null;
 
       function numericValue(value) {
         const amount = Number(value);
@@ -1173,6 +1320,15 @@
         return 'Rp ' + rupiahFormatter.format(numericCurrencyValue(value, 'IDR'));
       }
 
+      function updateTerminRateChip() {
+        if (!terminRateChip) {
+          return;
+        }
+
+        terminRateChip.innerHTML = '<i class="ti ti-currency-dollar"></i> '
+          + (usdToIdrRate ? 'Kurs sekarang USD ' + formatCurrency(Math.round(usdToIdrRate)) : 'Kurs USD belum tersedia');
+      }
+
       function formatUsd(value) {
         if (value === null || value === undefined) {
           return 'USD -';
@@ -1212,19 +1368,35 @@
           ? formatUsdInputValue(amountDisplayInput.value)
           : formatIdrInputValue(amountDisplayInput.value);
         amountDisplayInput.placeholder = amountCurrency() === 'USD' ? '0.00' : '0';
-        amountHelper.classList.remove('text-danger');
+        const hasAmountError = amountDisplayInput.classList.contains('is-invalid') && Number(amountInput.value || 0) <= 0;
+        amountHelper.classList.toggle('text-danger', hasAmountError);
 
         amountCurrencySwitch.querySelectorAll('button').forEach(function (button) {
           button.classList.toggle('is-active', button.dataset.currency === amountCurrency());
         });
 
-        if (amountCurrency() === 'USD') {
+        if (hasAmountError) {
+          amountHelper.textContent = amountInput.value ? 'Nominal transaksi harus lebih dari 0.' : 'Nominal transaksi wajib diisi.';
+        } else if (amountCurrency() === 'USD') {
           amountHelper.textContent = idrAmount === null
             ? 'Menunggu kurs USD...'
             : 'Setara ' + formatCurrency(idrAmount);
         } else {
-          amountHelper.textContent = '';
+          amountHelper.textContent = 'Isi nominal transaksi lebih dari 0.';
         }
+      }
+
+      function syncAmountValidation(showError) {
+        const isValid = Number(amountInput.value || 0) > 0;
+
+        amountDisplayInput.classList.toggle('is-invalid', showError && !isValid);
+        amountHelper.classList.toggle('text-danger', showError && !isValid);
+
+        if (showError && !isValid) {
+          amountHelper.textContent = amountInput.value ? 'Nominal transaksi harus lebih dari 0.' : 'Nominal transaksi wajib diisi.';
+        }
+
+        return isValid;
       }
 
       function setAmountCurrency(currency) {
@@ -1324,17 +1496,20 @@
 
       async function fetchUsdRate() {
         try {
-          const response = await fetch('https://open.er-api.com/v6/latest/USD', { cache: 'no-store' });
+          const response = await fetch('https://api.frankfurter.dev/v2/rates?base=USD&quotes=IDR', { cache: 'no-store' });
           const data = await response.json();
-          const rate = Number(data && data.rates ? data.rates.IDR : 0);
+          const rate = Array.isArray(data)
+            ? Number(data[0] ? data[0].rate : 0)
+            : Number(data && data.rates ? data.rates.IDR : 0);
 
           if (rate > 0) {
             usdToIdrRate = rate;
+            updateTerminRateChip();
             syncAmountInput();
             updateTerminInfo();
           }
         } catch (error) {
-          usdToIdrRate = null;
+          updateTerminRateChip();
         }
       }
 
@@ -1626,6 +1801,7 @@
         input.addEventListener('input', function () {
           if (input === amountDisplayInput) {
             syncAmountInput();
+            syncAmountValidation(amountDisplayInput.classList.contains('is-invalid'));
             updateAllocationSummary();
           }
 
@@ -1635,6 +1811,7 @@
         input.addEventListener('change', function () {
           if (input === amountDisplayInput) {
             syncAmountInput();
+            syncAmountValidation(amountDisplayInput.classList.contains('is-invalid'));
             updateAllocationSummary();
           }
 
@@ -1685,6 +1862,12 @@
           return;
         }
 
+        if (!syncAmountValidation(true)) {
+          event.preventDefault();
+          amountDisplayInput.focus();
+          return;
+        }
+
         if (!activityInput.value) {
           event.preventDefault();
           const searchInput = activityInput.closest('.searchable-select').querySelector('[data-role="search-input"]');
@@ -1722,6 +1905,7 @@
       });
 
       syncAmountInput();
+      updateTerminRateChip();
 
       if (amountCurrency() === 'USD' && !usdToIdrRate) {
         fetchUsdRate();

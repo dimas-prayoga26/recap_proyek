@@ -55,6 +55,50 @@ class VendorImportTest extends TestCase
             });
     }
 
+    public function test_vendor_index_shows_total_offer_nominal_per_vendor(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Vendor Offer Total',
+            'slug' => 'project-vendor-offer-total-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::create(['name' => 'Vendor Total Penawaran']);
+
+        ProjectOffer::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'project_name' => $project->name,
+            'pekerjaan' => 'Pekerjaan Total A',
+            'brand' => $vendor->name,
+            'penawaran_rupiah' => 1500000,
+            'penawaran_usd' => 125.50,
+        ]);
+        ProjectOffer::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'project_name' => $project->name,
+            'pekerjaan' => 'Pekerjaan Total B',
+            'brand' => $vendor->name,
+            'penawaran_rupiah' => 2000000,
+        ]);
+
+        $response = $this->get(route('vendor.index', [
+            'search' => 'Vendor Total Penawaran',
+        ]));
+
+        $response
+            ->assertSee('Total Penawaran')
+            ->assertSee('Rp 3.500.000')
+            ->assertSee('USD 125.50')
+            ->assertViewHas('vendors', function ($vendors) use ($vendor): bool {
+                $listedVendor = $vendors->getCollection()->firstWhere('id', $vendor->id);
+
+                return $listedVendor !== null
+                    && (int) $listedVendor->total_penawaran_rupiah === 3500000
+                    && (float) $listedVendor->total_penawaran_usd === 125.50;
+            });
+    }
+
     public function test_import_creates_new_vendors_and_skips_existing_names(): void
     {
         Vendor::create(['name' => 'Vendor Sudah Ada']);

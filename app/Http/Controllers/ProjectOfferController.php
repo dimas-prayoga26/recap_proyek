@@ -13,7 +13,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator as ValidationValidator;
 use Illuminate\View\View;
 
 class ProjectOfferController extends Controller
@@ -94,18 +96,7 @@ class ProjectOfferController extends Controller
     {
         $this->normalizeOfferAmounts($request);
 
-        $validated = $request->validate([
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
-            'pekerjaan' => ['required', 'string', 'max:255'],
-            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
-            'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
-            'penawaran_rupiah' => ['nullable', 'integer', 'min:0', 'required_without:penawaran_usd'],
-            'catatan' => ['nullable', 'string'],
-            'is_package' => ['nullable', 'boolean'],
-            'package_items' => ['nullable', 'array'],
-            'package_items.*.name' => ['nullable', 'string', 'max:255'],
-            'package_items.*.brand' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $this->validateOffer($request);
         $packageItems = $this->validatedPackageItems($request);
         $isPackage = $request->boolean('is_package');
 
@@ -182,18 +173,7 @@ class ProjectOfferController extends Controller
     {
         $this->normalizeOfferAmounts($request);
 
-        $validated = $request->validate([
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
-            'pekerjaan' => ['required', 'string', 'max:255'],
-            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
-            'penawaran_usd' => ['nullable', 'numeric', 'min:0', 'required_without:penawaran_rupiah'],
-            'penawaran_rupiah' => ['nullable', 'integer', 'min:0', 'required_without:penawaran_usd'],
-            'catatan' => ['nullable', 'string'],
-            'is_package' => ['nullable', 'boolean'],
-            'package_items' => ['nullable', 'array'],
-            'package_items.*.name' => ['nullable', 'string', 'max:255'],
-            'package_items.*.brand' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $this->validateOffer($request);
         $packageItems = $this->validatedPackageItems($request);
         $isPackage = $request->boolean('is_package');
 
@@ -285,6 +265,44 @@ class ProjectOfferController extends Controller
                 'project_id' => $projectId,
             ]))
             ->with('status', 'Kategori pekerjaan berhasil dihapus.');
+    }
+
+    /**
+     * @return array{
+     *     project_id?: int|null,
+     *     pekerjaan: string,
+     *     vendor_id?: int|null,
+     *     penawaran_usd?: string|null,
+     *     penawaran_rupiah?: string|null,
+     *     catatan?: string|null,
+     *     is_package?: bool|null,
+     *     package_items?: array<int, array{name?: string|null, brand?: string|null}>|null
+     * }
+     */
+    private function validateOffer(Request $request): array
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'pekerjaan' => ['required', 'string', 'max:255'],
+            'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
+            'penawaran_usd' => ['nullable', 'numeric', 'min:0'],
+            'penawaran_rupiah' => ['nullable', 'integer', 'min:0'],
+            'catatan' => ['nullable', 'string'],
+            'is_package' => ['nullable', 'boolean'],
+            'package_items' => ['nullable', 'array'],
+            'package_items.*.name' => ['nullable', 'string', 'max:255'],
+            'package_items.*.brand' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $validator->after(function (ValidationValidator $validator) use ($request): void {
+            if ((float) ($request->input('penawaran_usd') ?? 0) > 0 || (int) ($request->input('penawaran_rupiah') ?? 0) > 0) {
+                return;
+            }
+
+            $validator->errors()->add('penawaran', 'Isi Penawaran USD atau Penawaran Rupiah dengan nominal lebih dari 0.');
+        });
+
+        return $validator->validate();
     }
 
     private function workItemHasPaymentHistory(WorkItem $workItem): bool

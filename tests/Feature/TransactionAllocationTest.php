@@ -12,6 +12,7 @@ use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class TransactionAllocationTest extends TestCase
@@ -20,6 +21,8 @@ class TransactionAllocationTest extends TestCase
 
     public function test_expense_form_exposes_usd_offer_for_usd_only_work_item(): void
     {
+        Cache::put('exchange-rate.usd-idr', 17000, 300);
+
         $project = Project::create([
             'name' => 'Project USD Termin Test',
             'slug' => 'project-usd-termin-test-'.uniqid(),
@@ -43,6 +46,7 @@ class TransactionAllocationTest extends TestCase
             ->assertSee('id="amount-currency-switch"', false)
             ->assertSee('name="amount_display"', false)
             ->assertSee('data-currency="USD"', false)
+            ->assertSee('Kurs sekarang USD Rp 17.000')
             ->assertViewHas('workItemTerminInfo', function (array $workItemTerminInfo) use ($workItem): bool {
                 return isset($workItemTerminInfo[$workItem->id])
                     && $workItemTerminInfo[$workItem->id]['offer'] === 0
@@ -87,6 +91,120 @@ class TransactionAllocationTest extends TestCase
         $response->assertRedirect(route('uang-keluar.index'));
 
         $this->assertSame(20008000, ProjectTransaction::query()->latest('id')->value('amount'));
+    }
+
+    public function test_expense_transaction_creates_default_category_when_category_is_not_submitted(): void
+    {
+        TransactionCategory::query()
+            ->where('type', 'keluar')
+            ->update(['status' => 'inactive']);
+        $project = Project::create([
+            'name' => 'Project Default Category Test',
+            'slug' => 'project-default-category-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::firstOrCreate(['name' => 'Vendor Default Category']);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Kategori Default',
+            'offer_rupiah' => 50000000,
+        ]);
+
+        $response = $this->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'amount' => 10000000,
+            'recorded_at' => '2026-09-02',
+            'payment_number' => 1,
+            'receipt_total' => 50000000,
+        ]);
+
+        $response->assertRedirect(route('uang-keluar.index'));
+
+        $transaction = ProjectTransaction::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('Operasional', $transaction->category->name);
+        $this->assertSame('active', $transaction->category->status);
+        $this->assertDatabaseHas('project_transactions', [
+            'id' => $transaction->id,
+            'transaction_category_id' => $transaction->category->id,
+        ]);
+    }
+
+    public function test_expense_transaction_rejects_zero_amount(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Debit Zero Amount Test',
+            'slug' => 'project-debit-zero-amount-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::firstOrCreate(['name' => 'Vendor Debit Zero Amount']);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pekerjaan Debit Nominal Nol',
+            'offer_rupiah' => 50000000,
+        ]);
+
+        $response = $this->from(route('uang-keluar.index'))->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'vendor_id' => $vendor->id,
+            'amount' => 0,
+            'recorded_at' => '2026-09-02',
+            'payment_number' => 1,
+            'receipt_total' => 50000000,
+        ]);
+
+        $response
+            ->assertRedirect(route('uang-keluar.index'))
+            ->assertSessionHasErrors([
+                'amount' => 'Nominal transaksi harus lebih dari 0.',
+            ]);
+
+        $this->assertDatabaseMissing('project_transactions', [
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'amount' => 0,
+        ]);
+    }
+
+    public function test_income_transaction_rejects_zero_amount(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Credit Zero Amount Test',
+            'slug' => 'project-credit-zero-amount-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Pekerjaan Credit Nominal Nol',
+            'offer_rupiah' => 50000000,
+        ]);
+
+        $response = $this->from(route('uang-masuk.index'))->post(route('transactions.store'), [
+            'type' => 'masuk',
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'amount' => 0,
+            'recorded_at' => '2026-09-02',
+        ]);
+
+        $response
+            ->assertRedirect(route('uang-masuk.index'))
+            ->assertSessionHasErrors([
+                'amount' => 'Nominal transaksi harus lebih dari 0.',
+            ]);
+
+        $this->assertDatabaseMissing('project_transactions', [
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'amount' => 0,
+        ]);
     }
 
     public function test_expense_transaction_can_allocate_overpayment_to_another_work_item(): void

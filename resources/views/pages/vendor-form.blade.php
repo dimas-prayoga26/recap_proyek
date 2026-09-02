@@ -1,3 +1,8 @@
+@php
+  $formatRupiah = fn ($value) => (int) ($value ?? 0) > 0 ? 'Rp '.number_format((int) $value, 0, ',', '.') : null;
+  $formatUsd = fn ($value) => (float) ($value ?? 0) > 0 ? 'USD '.number_format((float) $value, 2, '.', ',') : null;
+@endphp
+
 @extends('layouts.app')
 
 @section('title', $title)
@@ -38,6 +43,20 @@
       display: block;
       font-size: 12px;
       margin-top: 2px;
+    }
+
+    .vendor-offer-total {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .vendor-offer-total-value {
+      color: #202939;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+      white-space: nowrap;
     }
 
     .vendor-filter-grid {
@@ -194,6 +213,7 @@
                   <th>Telepon</th>
                   <th class="text-end">Pekerjaan</th>
                   <th class="text-end">Penawaran</th>
+                  <th class="text-end">Total Penawaran</th>
                   <th class="text-end">Aksi</th>
                 </tr>
               </thead>
@@ -209,6 +229,22 @@
                     <td>{{ $vendor->phone ?: '-' }}</td>
                     <td class="text-end">{{ $vendor->work_items_count }}</td>
                     <td class="text-end">{{ $vendor->offers_count }}</td>
+                    <td class="text-end">
+                      @php($totalRupiah = $formatRupiah($vendor->total_penawaran_rupiah))
+                      @php($totalUsd = $formatUsd($vendor->total_penawaran_usd))
+                      @if ($totalRupiah || $totalUsd)
+                        <span class="vendor-offer-total">
+                          @if ($totalRupiah)
+                            <span class="vendor-offer-total-value">{{ $totalRupiah }}</span>
+                          @endif
+                          @if ($totalUsd)
+                            <span class="vendor-offer-total-value">{{ $totalUsd }}</span>
+                          @endif
+                        </span>
+                      @else
+                        -
+                      @endif
+                    </td>
                     <td class="text-end">
                       <div class="d-flex justify-content-end gap-2">
                         <button
@@ -234,7 +270,7 @@
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="5" class="text-center text-muted py-4">Vendor tidak ditemukan.</td>
+                    <td colspan="6" class="text-center text-muted py-4">Vendor tidak ditemukan.</td>
                   </tr>
                 @endforelse
               </tbody>
@@ -393,7 +429,7 @@
           <div class="modal-body">
             <p class="text-muted">
               Upload file CSV berisi daftar master vendor supaya tidak perlu input satu-satu.
-              Kolomnya harus sama seperti hasil <a href="{{ route('vendor.export', $filters) }}">Export Vendor</a>: <strong>Nama Vendor, Nama Kontak, No. Telepon, Catatan</strong>.
+              Import memakai kolom <strong>Nama Vendor, Nama Kontak, No. Telepon, Catatan</strong> dari file CSV.
               Vendor yang namanya sudah ada otomatis dilewati.
             </p>
             <div class="mb-0">

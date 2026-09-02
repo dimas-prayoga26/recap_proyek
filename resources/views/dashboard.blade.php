@@ -71,6 +71,13 @@
       transform: translateY(-1px);
     }
 
+    .termin-position-alias {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
     .termin-position-summary {
       align-items: center;
       border-top: 1px solid rgba(255, 193, 7, 0.24);
@@ -96,6 +103,10 @@
       display: block;
       font-weight: 700;
       white-space: nowrap;
+    }
+
+    .termin-position-card.is-paid-off .termin-position-summary {
+      border-top-color: rgba(0, 200, 83, 0.24);
     }
 
     .recent-transaction-card .card-header {
@@ -167,7 +178,103 @@
       gap: 6px;
     }
 
+    .offer-summary-card .card-body {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .offer-currency-switch {
+      align-items: center;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+    }
+
+    .offer-currency-switch button {
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      min-width: 38px;
+      padding: 8px 10px;
+    }
+
+    .offer-currency-switch button.active {
+      background: #ffffff;
+      color: #00897b;
+    }
+
+    .offer-summary-rate {
+      color: rgba(255, 255, 255, 0.72);
+      display: block;
+      font-size: 11px;
+      line-height: 1.35;
+      margin-top: -4px;
+    }
+
+    .offer-summary-total {
+      overflow-wrap: anywhere;
+    }
+
     @media (max-width: 767.98px) {
+      .dashboard-summary-strip {
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        margin-bottom: 24px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 8px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+
+      .dashboard-summary-strip::-webkit-scrollbar {
+        display: none;
+      }
+
+      .dashboard-summary-strip > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+      }
+
+      .dashboard-summary-strip .finance-stat {
+        margin-bottom: 0;
+      }
+
+      .termin-position-scroll {
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        gap: 12px;
+        margin-left: -2px;
+        margin-right: -2px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 2px 2px 8px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+
+      .termin-position-scroll::-webkit-scrollbar {
+        display: none;
+      }
+
+      .termin-position-scroll > .termin-position-card,
+      .termin-position-scroll > .termin-position-empty {
+        flex: 0 0 100%;
+        min-width: 100%;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+      }
+
       .recent-transaction-card .card-header .row {
         gap: 14px;
       }
@@ -184,8 +291,42 @@
 @endpush
 
 @section('content')
-  <div class="row">
-    <div class="col-xl-4 col-md-6">
+  <div class="row dashboard-summary-strip">
+    <div class="col-xl-3 col-md-6">
+      <div class="card bg-success dashnum-card finance-stat offer-summary-card text-white overflow-hidden">
+        <span class="round small"></span>
+        <span class="round big"></span>
+        <div class="card-body">
+          <div class="row">
+            <div class="col">
+              <div class="avtar avtar-lg">
+                <i class="text-white ti ti-businessplan"></i>
+              </div>
+            </div>
+            <div class="col-auto">
+              <div class="offer-currency-switch" role="group" aria-label="Pilih mata uang total penawaran">
+                <button type="button" class="active" data-offer-currency="idr">IDR</button>
+                <button type="button" data-offer-currency="usd">USD</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <span
+              class="text-white d-block f-34 f-w-500 my-2 offer-summary-total"
+              id="offer-summary-total"
+              data-idr-total="{{ $offerSummary['idr'] }}"
+              data-usd-total="{{ $offerSummary['usd'] }}"
+            >
+              {{ $offerSummary['idr'] }}
+            </span>
+            <span class="offer-summary-rate">Kurs sekarang USD {{ $offerSummary['rate'] }}</span>
+            <p class="mb-0 opacity-75">Total Penawaran</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
       <div class="card bg-secondary-dark dashnum-card finance-stat text-white overflow-hidden">
         <span class="round small"></span>
         <span class="round big"></span>
@@ -211,7 +352,7 @@
       </div>
     </div>
 
-    <div class="col-xl-4 col-md-6">
+    <div class="col-xl-3 col-md-6">
       <div class="card bg-primary-dark dashnum-card finance-stat text-white overflow-hidden">
         <span class="round small"></span>
         <span class="round big"></span>
@@ -237,7 +378,7 @@
       </div>
     </div>
 
-    <div class="col-xl-4 col-md-12">
+    <div class="col-xl-3 col-md-6">
       <div class="card bg-primary-dark dashnum-card finance-stat project-balance-card text-white overflow-hidden">
         <span class="round bg-primary small"></span>
         <span class="round bg-primary big"></span>
@@ -261,6 +402,9 @@
       </div>
     </div>
 
+  </div>
+
+  <div class="row">
     <div class="col-xl-8 col-md-12 d-flex dashboard-section-gap">
       <div class="card dashboard-equal-card w-100">
         <div class="card-body">
@@ -301,40 +445,45 @@
           </div>
 
           @if ($paymentGroup)
-            <a
-              href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
-              class="rounded bg-light-warning p-3 d-block text-decoration-none termin-position-card"
-            >
-              <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center">
-                  <div class="avtar avtar-lg bg-warning text-white">
-                    <i class="ti ti-clock-dollar"></i>
+            @php
+              $terminColor = $paymentGroup['is_paid_off'] ? 'success' : 'warning';
+            @endphp
+            <div class="termin-position-scroll">
+              <a
+                href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
+                class="rounded bg-light-{{ $terminColor }} p-3 d-block text-decoration-none termin-position-card {{ $paymentGroup['is_paid_off'] ? 'is-paid-off' : '' }}"
+              >
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <div class="d-flex align-items-center">
+                    <div class="avtar avtar-lg bg-{{ $terminColor }} text-white termin-position-alias">{{ $paymentGroup['work_item_alias'] }}</div>
+                    <div class="ms-2">
+                      <h5 class="mb-0">{{ $paymentGroup['work_item_name'] }}</h5>
+                      <small class="text-muted">{{ $paymentGroup['vendor_name'] }}</small>
+                    </div>
                   </div>
-                  <div class="ms-2">
-                    <h5 class="mb-0">{{ $paymentGroup['work_item_name'] }}</h5>
-                    <small class="text-muted">{{ $paymentGroup['vendor_name'] }}</small>
+                  <span class="badge bg-{{ $terminColor }}">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
+                </div>
+                <div class="progress mb-2" style="height: 8px">
+                  <div class="progress-bar bg-{{ $terminColor }}" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="termin-position-summary">
+                  <div class="termin-position-summary-item">
+                    <span>Dibayar</span>
+                    <strong class="text-success">{{ $paymentGroup['paid_amount'] }}</strong>
+                  </div>
+                  <div class="termin-position-summary-item text-end">
+                    <span>Sisa</span>
+                    <strong class="text-primary">{{ $paymentGroup['remaining_amount'] }}</strong>
                   </div>
                 </div>
-                <span class="badge bg-warning">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
-              </div>
-              <div class="progress mb-2" style="height: 8px">
-                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-              </div>
-              <div class="termin-position-summary">
-                <div class="termin-position-summary-item">
-                  <span>Dibayar</span>
-                  <strong class="text-success">{{ $paymentGroup['paid_amount'] }}</strong>
-                </div>
-                <div class="termin-position-summary-item text-end">
-                  <span>Sisa</span>
-                  <strong class="text-primary">{{ $paymentGroup['remaining_amount'] }}</strong>
-                </div>
-              </div>
-            </a>
+              </a>
+            </div>
           @else
-            <div class="rounded bg-light-secondary p-3">
-              <h5 class="mb-1">Belum ada termin</h5>
-              <small class="text-muted">Kelompok pembayaran untuk project ini belum dibuat.</small>
+            <div class="termin-position-scroll">
+              <div class="rounded bg-light-secondary p-3 termin-position-empty">
+                <h5 class="mb-1">Belum ada termin</h5>
+                <small class="text-muted">Kelompok pembayaran untuk project ini belum dibuat.</small>
+              </div>
             </div>
           @endif
         </div>
@@ -466,6 +615,8 @@
       const excelLink = document.querySelector('#export-excel-link');
       const pdfLink = document.querySelector('#export-pdf-link');
       const chartSeries = @json($chartSeries);
+      const offerSummaryTotal = document.querySelector('#offer-summary-total');
+      const offerCurrencyButtons = document.querySelectorAll('[data-offer-currency]');
 
       function updateExportLinks() {
         const selectedProject = activeProjectInput.value;
@@ -474,6 +625,19 @@
       }
 
       updateExportLinks();
+
+      offerCurrencyButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          const currency = button.dataset.offerCurrency;
+          offerSummaryTotal.textContent = currency === 'usd'
+            ? offerSummaryTotal.dataset.usdTotal
+            : offerSummaryTotal.dataset.idrTotal;
+
+          offerCurrencyButtons.forEach(function (option) {
+            option.classList.toggle('active', option === button);
+          });
+        });
+      });
 
       const receiptPreviewImage = document.querySelector('#receipt-preview-image');
       const receiptPreviewPdf = document.querySelector('#receipt-preview-pdf');

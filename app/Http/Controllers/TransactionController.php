@@ -11,6 +11,7 @@ use App\Models\ProjectTransactionAllocation;
 use App\Models\TransactionCategory;
 use App\Models\Vendor;
 use App\Models\WorkItem;
+use App\Support\ExchangeRateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,14 +24,14 @@ class TransactionController extends Controller
 {
     use ResolvesActiveProject;
 
-    public function createIncome(): View
+    public function createIncome(ExchangeRateService $exchangeRateService): View
     {
-        return $this->create('masuk', 'Input Credit');
+        return $this->create('masuk', 'Input Credit', $exchangeRateService);
     }
 
-    public function createExpense(): View
+    public function createExpense(ExchangeRateService $exchangeRateService): View
     {
-        return $this->create('keluar', 'Input Debit');
+        return $this->create('keluar', 'Input Debit', $exchangeRateService);
     }
 
     public function store(Request $request): RedirectResponse
@@ -43,7 +44,7 @@ class TransactionController extends Controller
             'transaction_category_id' => ['nullable', 'exists:transaction_categories,id'],
             'work_item_id' => ['required', 'exists:work_items,id'],
             'vendor_id' => ['nullable', 'exists:vendors,id'],
-            'amount' => ['required', 'integer', 'min:0'],
+            'amount' => ['required', 'integer', 'min:1'],
             'amount_display' => ['nullable', 'string', 'max:255'],
             'amount_currency' => ['nullable', Rule::in(['IDR', 'USD'])],
             'amount_exchange_rate' => ['nullable', 'numeric', 'min:0'],
@@ -59,6 +60,10 @@ class TransactionController extends Controller
             'allocations.*.payment_number' => ['nullable', 'integer', 'min:1'],
             'allocations.*.notes' => ['nullable', 'string', 'max:1000'],
             'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+        ], [
+            'amount.required' => 'Nominal transaksi wajib diisi.',
+            'amount.integer' => 'Nominal transaksi harus berupa angka.',
+            'amount.min' => 'Nominal transaksi harus lebih dari 0.',
         ]);
 
         $project = Project::query()->findOrFail($validated['project_id']);
@@ -70,12 +75,6 @@ class TransactionController extends Controller
             ]);
         }
 
-        $transactionCategoryId = $validated['transaction_category_id']
-            ?? TransactionCategory::query()
-                ->where('type', $validated['type'])
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->value('id');
         $additionalAllocations = $this->additionalAllocations($validated, $project);
         $additionalTotal = (int) $additionalAllocations->sum('amount');
 
@@ -85,7 +84,8 @@ class TransactionController extends Controller
                 ->withInput();
         }
 
-        $transaction = DB::transaction(function () use ($request, $validated, $project, $workItem, $transactionCategoryId, $additionalAllocations, $additionalTotal) {
+        $transaction = DB::transaction(function () use ($request, $validated, $project, $workItem, $additionalAllocations, $additionalTotal) {
+            $transactionCategoryId = $this->resolveTransactionCategoryId($validated);
             $paymentGroup = $this->paymentGroupFromTransaction($validated, $project, $workItem);
             $primaryAmount = $validated['type'] === 'keluar'
                 ? $validated['amount'] - $additionalTotal
@@ -156,9 +156,10 @@ class TransactionController extends Controller
             ->with('status', 'Transaksi berhasil disimpan.');
     }
 
-    private function create(string $type, string $title): View
+    private function create(string $type, string $title, ExchangeRateService $exchangeRateService): View
     {
         $activeProject = $this->activeProject();
+        $usdToIdrRate = $exchangeRateService->usdToIdr();
         $projects = Project::query()
             ->where('status', 'active')
             ->orderBy('name')
@@ -184,10 +185,19 @@ class TransactionController extends Controller
             'categories' => $categories,
             'workItems' => $workItems,
             'workItemTerminInfo' => $this->workItemTerminInfo($workItems),
+            'usdToIdrRate' => $usdToIdrRate,
+            'usdToIdrRateLabel' => $this->formatRupiah((int) round($usdToIdrRate)),
             'vendors' => Vendor::query()
                 ->orderBy('name')
                 ->get(),
         ]);
+    }
+
+    private function formatRupiah(int $amount): string
+    {
+        $prefix = $amount < 0 ? '- ' : '';
+
+        return $prefix.'Rp '.number_format(abs($amount), 0, ',', '.');
     }
 
     private function additionalAllocations(array $validated, Project $project): Collection
@@ -313,6 +323,35 @@ class TransactionController extends Controller
             'role' => $role,
             'notes' => $notes,
         ]);
+    }
+
+    /**
+     * @param  array{transaction_category_id?: int|null, type: string}  $validated
+     */
+    private function resolveTransactionCategoryId(array $validated): int
+    {
+        if (filled($validated['transaction_category_id'] ?? null)) {
+            return (int) $validated['transaction_category_id'];
+        }
+
+        $transactionCategoryId = TransactionCategory::query()
+            ->where('type', $validated['type'])
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->value('id');
+
+        if ($transactionCategoryId) {
+            return (int) $transactionCategoryId;
+        }
+
+        $defaultName = $validated['type'] === 'keluar' ? 'Operasional' : 'Dana Client';
+
+        return (int) TransactionCategory::query()
+            ->updateOrCreate(
+                ['name' => $defaultName, 'type' => $validated['type']],
+                ['status' => 'active'],
+            )
+            ->id;
     }
 
     private function nextPaymentNumber(PaymentGroup $paymentGroup): int

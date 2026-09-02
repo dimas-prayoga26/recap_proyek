@@ -92,7 +92,7 @@ class PaymentTermController extends Controller
                         ->mapWithKeys(fn (PaymentTerm $term): array => [
                             $term->payment_number => [
                                 'amount' => (int) $term->amount,
-                                'detail' => $this->paymentDetail($workItem, $term),
+                                'detail' => $this->paymentDetail($term),
                             ],
                         ])
                     : collect(),
@@ -100,7 +100,7 @@ class PaymentTermController extends Controller
         });
     }
 
-    private function paymentDetail(WorkItem $workItem, PaymentTerm $term): array
+    private function paymentDetail(PaymentTerm $term): array
     {
         $allocation = $term->allocations
             ->sortByDesc(fn ($allocation) => $allocation->transaction?->recorded_at?->timestamp ?? 0)
@@ -109,12 +109,8 @@ class PaymentTermController extends Controller
         $attachment = $transaction?->attachments->first();
 
         return [
-            'work_name' => $workItem->name,
-            'vendor_name' => $workItem->vendor?->name ?? '-',
             'payment_number' => $term->payment_number,
             'amount' => (int) $term->amount,
-            'recorded_at' => $transaction?->recorded_at?->format('d/m/Y') ?? $term->paid_at?->format('d/m/Y') ?? '-',
-            'type' => $transaction?->type === 'keluar' ? 'Debit' : ($transaction?->type === 'masuk' ? 'Credit' : '-'),
             'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
             'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : '',
             'receipt_mime' => $attachment?->mime_type ?? '',

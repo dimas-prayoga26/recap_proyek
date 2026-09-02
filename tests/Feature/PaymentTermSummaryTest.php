@@ -124,7 +124,7 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('Pasang Lantai');
     }
 
-    public function test_paid_payment_cell_contains_modal_transaction_and_receipt_details(): void
+    public function test_paid_payment_cell_shows_nominal_with_eye_button_and_limited_modal_details(): void
     {
         [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
         $vendor = Vendor::create(['name' => 'Vendor Bukti']);
@@ -171,10 +171,19 @@ class PaymentTermSummaryTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('term-payment-action', false)
+            ->assertSee('<span>Rp 2.500.000</span>', false)
             ->assertSee('term-payment-button', false)
-            ->assertSee('data-work-name="Pekerjaan Dengan Bukti"', false)
-            ->assertSee('data-vendor-name="Vendor Bukti"', false)
-            ->assertSee('kwitansi-test.pdf');
+            ->assertSee('<i class="ti ti-eye"></i>', false)
+            ->assertSee('data-amount="Rp 2.500.000"', false)
+            ->assertSee('data-notes="Allocation note"', false)
+            ->assertSee('kwitansi-test.pdf')
+            ->assertDontSee('data-work-name=', false)
+            ->assertDontSee('data-vendor-name=', false)
+            ->assertDontSee('id="payment-detail-work"', false)
+            ->assertDontSee('id="payment-detail-vendor"', false)
+            ->assertDontSee('id="payment-detail-type"', false)
+            ->assertDontSee('id="payment-detail-date"', false);
     }
 
     /**

@@ -73,6 +73,80 @@ class WorkPackageItemTest extends TestCase
         ]);
     }
 
+    public function test_regular_offer_rejects_zero_usd_and_rupiah_values(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Validasi Nilai Test',
+            'slug' => 'project-validasi-nilai-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+
+        $response = $this->from(route('kategori-pekerjaan.index'))->post(route('kategori-pekerjaan.store'), [
+            'pekerjaan' => 'Pekerjaan Nilai Kosong',
+            'penawaran_usd' => '0.00',
+            'penawaran_rupiah' => '0',
+        ]);
+
+        $response
+            ->assertRedirect(route('kategori-pekerjaan.index'))
+            ->assertSessionHasErrors([
+                'penawaran' => 'Isi Penawaran USD atau Penawaran Rupiah dengan nominal lebih dari 0.',
+            ]);
+
+        $this->assertDatabaseMissing('project_offers', [
+            'project_id' => $project->id,
+            'pekerjaan' => 'Pekerjaan Nilai Kosong',
+        ]);
+    }
+
+    public function test_regular_offer_update_rejects_zero_usd_and_rupiah_values(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Validasi Update Nilai Test',
+            'slug' => 'project-validasi-update-nilai-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Pekerjaan Update Nilai',
+            'offer_rupiah' => 5000000,
+        ]);
+        $offer = ProjectOffer::create([
+            'project_id' => $project->id,
+            'work_item_id' => $workItem->id,
+            'project_name' => $project->name,
+            'area' => '',
+            'pekerjaan' => 'Pekerjaan Update Nilai',
+            'penawaran_rupiah' => 5000000,
+        ]);
+
+        $response = $this->from(route('kategori-pekerjaan.index'))->put(route('kategori-pekerjaan.update', $offer), [
+            'project_id' => $project->id,
+            'pekerjaan' => 'Pekerjaan Update Nilai',
+            'penawaran_usd' => '0',
+            'penawaran_rupiah' => '0',
+        ]);
+
+        $response
+            ->assertRedirect(route('kategori-pekerjaan.index'))
+            ->assertSessionHasErrors([
+                'penawaran' => 'Isi Penawaran USD atau Penawaran Rupiah dengan nominal lebih dari 0.',
+            ]);
+
+        $this->assertDatabaseHas('project_offers', [
+            'id' => $offer->id,
+            'penawaran_rupiah' => 5000000,
+        ]);
+        $this->assertDatabaseHas('work_items', [
+            'id' => $workItem->id,
+            'offer_rupiah' => 5000000,
+        ]);
+    }
+
     public function test_package_offer_stores_child_items_in_their_own_table(): void
     {
         $project = Project::create([

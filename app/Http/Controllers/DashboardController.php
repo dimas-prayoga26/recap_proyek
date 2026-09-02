@@ -6,12 +6,15 @@ use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\ActiveProjectSelection;
 use App\Models\PaymentGroup;
 use App\Models\Project;
+use App\Models\ProjectOffer;
 use App\Models\ProjectTransaction;
+use App\Support\ExchangeRateService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -19,7 +22,7 @@ class DashboardController extends Controller
 {
     use ResolvesActiveProject;
 
-    public function index(): View
+    public function index(ExchangeRateService $exchangeRateService): View
     {
         $projects = Project::query()
             ->where('status', 'active')
@@ -31,16 +34,18 @@ class DashboardController extends Controller
         $income = $this->projectTotal($activeProject, 'masuk');
         $expense = $this->projectTotal($activeProject, 'keluar');
         $balance = $income - $expense;
+        $usdToIdrRate = $exchangeRateService->usdToIdr();
 
         return view('dashboard', [
             'projects' => $projects,
             'activeProject' => $activeProject,
             'projectBalances' => $this->projectBalances($projects),
+            'offerSummary' => $this->projectOfferSummary($activeProject, $usdToIdrRate),
             'summary' => [
                 'income' => $this->formatRupiahShort($income),
                 'expense' => $this->formatRupiahShort($expense),
                 'balance' => $this->formatRupiahShort($balance),
-                'balance_usd' => number_format(max(0, $balance) / 16300, 0, ',', '.'),
+                'balance_usd' => number_format(max(0, $balance) / $usdToIdrRate, 0, ',', '.'),
             ],
             'chartSeries' => $this->chartSeries($activeProject),
             'paymentGroup' => $this->paymentGroupSummary($activeProject),
@@ -70,6 +75,34 @@ class DashboardController extends Controller
         }
 
         return redirect()->route('dashboard');
+    }
+
+    private function projectOfferSummary(?Project $project, float $usdToIdrRate): array
+    {
+        if (! $project) {
+            return [
+                'idr' => $this->formatRupiahShort(0),
+                'usd' => $this->formatUsdShort(0),
+                'rate' => $this->formatRupiah((int) round($usdToIdrRate)),
+            ];
+        }
+
+        $totals = ProjectOffer::query()
+            ->whereBelongsTo($project)
+            ->toBase()
+            ->selectRaw('COALESCE(SUM(penawaran_rupiah), 0) as rupiah_total')
+            ->selectRaw('COALESCE(SUM(penawaran_usd), 0) as usd_total')
+            ->first();
+
+        $rupiahTotal = (int) ($totals->rupiah_total ?? 0);
+        $usdTotal = (float) ($totals->usd_total ?? 0);
+        $idrEquivalent = $rupiahTotal + (int) round($usdTotal * $usdToIdrRate);
+
+        return [
+            'idr' => $this->formatRupiahShort($idrEquivalent),
+            'usd' => $this->formatUsdShort($idrEquivalent / $usdToIdrRate),
+            'rate' => $this->formatRupiah((int) round($usdToIdrRate)),
+        ];
     }
 
     private function projectTotal(?Project $project, string $type): int
@@ -175,14 +208,36 @@ class DashboardController extends Controller
             'code' => $paymentGroup->code,
             'work_item_id' => $paymentGroup->work_item_id,
             'work_item_name' => $paymentGroup->workItem?->name ?? 'Belum ada pekerjaan',
+            'work_item_alias' => $this->workItemAlias($paymentGroup->workItem?->name ?? 'Termin'),
             'vendor_name' => $paymentGroup->workItem?->vendor?->name ?? '-',
             'paid_terms' => $paidTerms,
             'total_terms' => $totalTerms,
             'progress' => $progress,
+            'is_paid_off' => $remainingAmount <= 0,
             'total_amount' => $this->formatRupiah($totalAmount),
             'paid_amount' => $this->formatRupiah($paidAmount),
             'remaining_amount' => $this->formatRupiah($remainingAmount),
         ];
+    }
+
+    private function workItemAlias(string $name): string
+    {
+        $words = collect(preg_split('/\s+/u', trim($name)) ?: [])
+            ->filter()
+            ->take(2)
+            ->values();
+
+        if ($words->isEmpty()) {
+            return 'TR';
+        }
+
+        if ($words->count() === 1) {
+            return Str::upper(Str::substr((string) $words->first(), 0, 2));
+        }
+
+        return Str::upper($words
+            ->map(fn (string $word): string => Str::substr($word, 0, 1))
+            ->join(''));
     }
 
     private function recentTransactions(?Project $project): Collection
@@ -257,6 +312,23 @@ class DashboardController extends Controller
         }
 
         return $prefix.$this->formatRupiah($amount);
+    }
+
+    private function formatUsdShort(float $amount): string
+    {
+        if ($amount <= 0) {
+            return 'USD 0';
+        }
+
+        if ($amount >= 1000000) {
+            return 'USD '.$this->formatDecimal($amount / 1000000).' M';
+        }
+
+        if ($amount >= 1000) {
+            return 'USD '.$this->formatDecimal($amount / 1000).' K';
+        }
+
+        return 'USD '.number_format($amount, $amount >= 100 ? 0 : 2, '.', ',');
     }
 
     private function formatDecimal(float $value): string
