@@ -7,6 +7,8 @@ use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
 use App\Models\Project;
 use App\Models\ProjectOffer;
+use App\Models\ProjectTransaction;
+use App\Models\TransactionCategory;
 use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
@@ -166,5 +168,54 @@ class DashboardTest extends TestCase
             ->assertSee('bg-light-success', false)
             ->assertSee('is-paid-off', false)
             ->assertSee('progress-bar bg-success', false);
+    }
+
+    public function test_dashboard_receipt_preview_uses_relative_storage_url_for_modal(): void
+    {
+        config(['filesystems.disks.public.url' => 'http://127.0.0.1:8001/storage']);
+        Cache::put('exchange-rate.usd-idr', 17000, 300);
+
+        $project = Project::create([
+            'name' => 'Project Receipt Dashboard',
+            'slug' => 'project-receipt-dashboard-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Pekerjaan Bukti Dashboard',
+            'offer_rupiah' => 2500000,
+        ]);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $transaction = ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'type' => 'keluar',
+            'amount' => 2500000,
+            'recorded_at' => '2026-09-02',
+        ]);
+        $transaction->attachments()->create([
+            'disk' => 'public',
+            'path' => 'transaction-receipts/bukti-dashboard.jpg',
+            'original_name' => 'bukti-dashboard.jpg',
+            'mime_type' => 'image/jpeg',
+            'size' => 61000,
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response
+            ->assertSee('data-bs-target="#receipt-preview-modal"', false)
+            ->assertSee('receipt-modal-preview', false)
+            ->assertSee('max-height: min(62vh, 520px)', false)
+            ->assertSee('data-receipt-url="/storage/transaction-receipts/bukti-dashboard.jpg"', false)
+            ->assertDontSee('127.0.0.1:8001/storage');
     }
 }

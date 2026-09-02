@@ -178,6 +178,33 @@
       gap: 6px;
     }
 
+    .receipt-modal-preview {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      max-height: min(62vh, 520px);
+      min-height: 220px;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .receipt-modal-preview img {
+      display: block;
+      height: auto;
+      max-height: min(56vh, 460px);
+      max-width: 100%;
+      object-fit: contain;
+      width: auto;
+    }
+
+    .receipt-modal-preview iframe {
+      height: min(56vh, 460px);
+      max-height: 460px;
+    }
+
     .offer-summary-card .card-body {
       display: flex;
       flex-direction: column;
@@ -596,8 +623,10 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body text-center">
-          <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
-          <iframe src="" id="receipt-preview-pdf" class="w-100 border rounded d-none" style="height: 70vh;" title="Bukti transaksi PDF"></iframe>
+          <div class="receipt-modal-preview">
+            <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
+            <iframe src="" id="receipt-preview-pdf" class="w-100 border rounded d-none" title="Bukti transaksi PDF"></iframe>
+          </div>
           <a href="#" id="receipt-preview-download" class="btn btn-light-primary mt-3 d-none" target="_blank" rel="noopener">
             Buka PDF
           </a>

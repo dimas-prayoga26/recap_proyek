@@ -114,6 +114,33 @@
       gap: 8px;
     }
 
+    .payment-detail-preview {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      max-height: min(58vh, 460px);
+      min-height: 180px;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .payment-detail-preview img {
+      display: block;
+      height: auto;
+      max-height: min(52vh, 400px);
+      max-width: 100%;
+      object-fit: contain;
+      width: auto;
+    }
+
+    .payment-detail-preview iframe {
+      height: min(52vh, 400px);
+      max-height: 400px;
+    }
+
     .vendor-search-dropdown {
       position: relative;
     }
@@ -302,9 +329,11 @@
           </div>
           <div class="py-3">
             <span class="d-block text-muted fs-6 mb-2">Bukti Pembayaran</span>
-            <div id="payment-detail-empty" class="alert alert-light-secondary mb-0">Bukti belum ada.</div>
-            <img src="" id="payment-detail-image" class="img-fluid rounded d-none" alt="Bukti pembayaran" />
-            <iframe src="" id="payment-detail-pdf" class="w-100 border rounded d-none" style="height: 60vh;" title="Bukti pembayaran PDF"></iframe>
+            <div class="payment-detail-preview">
+              <div id="payment-detail-empty" class="alert alert-light-secondary mb-0">Bukti belum ada.</div>
+              <img src="" id="payment-detail-image" class="img-fluid rounded d-none" alt="Bukti pembayaran" />
+              <iframe src="" id="payment-detail-pdf" class="w-100 border rounded d-none" title="Bukti pembayaran PDF"></iframe>
+            </div>
             <a href="#" id="payment-detail-download" class="btn btn-light-primary payment-detail-file mt-3 d-none" target="_blank" rel="noopener">
               <i class="ti ti-external-link"></i>
               <span>Buka Bukti Pembayaran</span>

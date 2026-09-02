@@ -126,6 +126,8 @@ class PaymentTermSummaryTest extends TestCase
 
     public function test_paid_payment_cell_shows_nominal_with_eye_button_and_limited_modal_details(): void
     {
+        config(['filesystems.disks.public.url' => 'http://127.0.0.1:8001/storage']);
+
         [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
         $vendor = Vendor::create(['name' => 'Vendor Bukti']);
         $category = TransactionCategory::firstOrCreate(
@@ -175,12 +177,16 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('<span>Rp 2.500.000</span>', false)
             ->assertSee('term-payment-button', false)
             ->assertSee('<i class="ti ti-eye"></i>', false)
+            ->assertSee('payment-detail-preview', false)
+            ->assertSee('max-height: min(58vh, 460px)', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
             ->assertSee('data-notes="Allocation note"', false)
             ->assertSee('data-receipt-mime=""', false)
+            ->assertSee('data-receipt-url="/storage/transaction-receipts/kwitansi-test.pdf"', false)
             ->assertSee('kwitansi-test.pdf')
             ->assertSee('receiptPath.endsWith(\'.pdf\')', false)
             ->assertSee('Preview gambar gagal dimuat. Buka file bukti pembayaran.')
+            ->assertDontSee('127.0.0.1:8001/storage')
             ->assertDontSee('data-work-name=', false)
             ->assertDontSee('data-vendor-name=', false)
             ->assertDontSee('id="payment-detail-work"', false)

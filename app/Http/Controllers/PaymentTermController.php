@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveProject;
 use App\Models\PaymentGroup;
 use App\Models\PaymentTerm;
+use App\Models\ProjectTransactionAttachment;
 use App\Models\Vendor;
 use App\Models\WorkItem;
 use Illuminate\Http\Request;
@@ -112,10 +113,19 @@ class PaymentTermController extends Controller
             'payment_number' => $term->payment_number,
             'amount' => (int) $term->amount,
             'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
-            'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : '',
+            'receipt_url' => $attachment ? $this->attachmentUrl($attachment) : '',
             'receipt_mime' => $attachment?->mime_type ?? '',
             'receipt_name' => $attachment?->original_name ?? '',
         ];
+    }
+
+    private function attachmentUrl(ProjectTransactionAttachment $attachment): string
+    {
+        if ($attachment->disk === 'public') {
+            return '/storage/'.ltrim($attachment->path, '/');
+        }
+
+        return Storage::disk($attachment->disk)->url($attachment->path);
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array

@@ -8,6 +8,7 @@ use App\Models\PaymentGroup;
 use App\Models\Project;
 use App\Models\ProjectOffer;
 use App\Models\ProjectTransaction;
+use App\Models\ProjectTransactionAttachment;
 use App\Support\ExchangeRateService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -264,10 +265,19 @@ class DashboardController extends Controller
                     'vendor' => $transaction->vendor?->name ?? $transaction->workItem?->vendor?->name ?? '-',
                     'type' => $transaction->type,
                     'amount' => $this->formatRupiah($transaction->amount),
-                    'receipt_url' => $attachment ? Storage::disk($attachment->disk)->url($attachment->path) : null,
+                    'receipt_url' => $attachment ? $this->attachmentUrl($attachment) : null,
                     'receipt_mime' => $attachment?->mime_type,
                 ];
             });
+    }
+
+    private function attachmentUrl(ProjectTransactionAttachment $attachment): string
+    {
+        if ($attachment->disk === 'public') {
+            return '/storage/'.ltrim($attachment->path, '/');
+        }
+
+        return Storage::disk($attachment->disk)->url($attachment->path);
     }
 
     private function dayName(?CarbonInterface $date): string
