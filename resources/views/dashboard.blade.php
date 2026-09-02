@@ -63,7 +63,17 @@
 @push('styles')
   <style>
     .termin-position-card {
+      flex: 0 0 auto;
       transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .termin-position-panel {
+      overflow: hidden;
+    }
+
+    .termin-position-panel .card-body {
+      height: 100%;
+      min-height: 0;
     }
 
     .termin-position-card:hover {
@@ -320,6 +330,14 @@
         margin-bottom: 0;
       }
 
+      .termin-position-panel {
+        overflow: visible;
+      }
+
+      .termin-position-panel .card-body {
+        height: auto;
+      }
+
       .termin-position-scroll {
         -webkit-overflow-scrolling: touch;
         flex-direction: row;
@@ -476,7 +494,7 @@
 
   <div class="row">
     <div class="col-xl-8 col-md-12 d-flex dashboard-section-gap">
-      <div class="card dashboard-equal-card w-100">
+      <div class="card dashboard-equal-card termin-position-panel w-100">
         <div class="card-body">
           <div class="row mb-3 align-items-center">
             <div class="col">
@@ -501,8 +519,8 @@
         <div class="card-body d-flex flex-column">
           <div class="row mb-3 align-items-center">
             <div class="col">
-              <small class="text-muted">{{ $activeProject?->name ?? 'Belum ada project' }}</small>
-              <h4 class="mb-0">Posisi Termin</h4>
+              <small class="text-muted">Aktivitas terbaru</small>
+              <h4 class="mb-0">Termin Aktivitas</h4>
             </div>
             <div class="col-auto">
               <a

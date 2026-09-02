@@ -163,11 +163,14 @@ class DashboardTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('Aktivitas terbaru')
+            ->assertSee('Termin Aktivitas')
             ->assertSee('termin-position-alias', false)
             ->assertSee('>PR<', false)
             ->assertSee('bg-light-success', false)
             ->assertSee('is-paid-off', false)
-            ->assertSee('progress-bar bg-success', false);
+            ->assertSee('progress-bar bg-success', false)
+            ->assertDontSee('Posisi Termin');
     }
 
     public function test_dashboard_shows_all_payment_groups_in_position_scroll(): void
@@ -227,8 +230,10 @@ class DashboardTest extends TestCase
 
         $response
             ->assertSee('termin-position-scroll', false)
+            ->assertSee('termin-position-panel', false)
             ->assertSee('Belanja Tambahan Marmer')
             ->assertSee('Pintu Utama Aluminium')
+            ->assertSee('overflow: hidden', false)
             ->assertSee('flex-direction: column', false)
             ->assertSee('flex-direction: row', false);
     }
