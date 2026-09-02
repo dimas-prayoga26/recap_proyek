@@ -68,12 +68,24 @@
     }
 
     .termin-position-panel {
+      display: flex;
+      flex-direction: column;
+      height: 552px;
+      max-height: 552px;
       overflow: hidden;
     }
 
     .termin-position-panel .card-body {
+      display: flex !important;
+      flex-direction: column;
       height: 100%;
+      max-height: 100%;
       min-height: 0;
+      overflow: hidden;
+    }
+
+    .termin-position-panel .card-body > .row {
+      flex: 0 0 auto;
     }
 
     .termin-position-card:hover {
@@ -83,12 +95,15 @@
 
     .termin-position-scroll {
       display: flex;
-      flex: 1;
+      flex: 1 1 auto;
       flex-direction: column;
       gap: 12px;
+      height: 0;
+      max-height: 100%;
       min-height: 0;
       overflow-y: auto;
       padding-right: 4px;
+      overscroll-behavior: contain;
     }
 
     .termin-position-alias {
@@ -331,17 +346,25 @@
       }
 
       .termin-position-panel {
+        display: block;
+        height: auto;
+        max-height: none;
         overflow: visible;
       }
 
       .termin-position-panel .card-body {
         height: auto;
+        max-height: none;
+        overflow: visible;
       }
 
       .termin-position-scroll {
         -webkit-overflow-scrolling: touch;
+        flex: 0 0 auto;
         flex-direction: row;
         gap: 12px;
+        height: auto;
+        max-height: none;
         margin-left: -2px;
         margin-right: -2px;
         overflow-x: auto;
@@ -494,7 +517,7 @@
 
   <div class="row">
     <div class="col-xl-8 col-md-12 d-flex dashboard-section-gap">
-      <div class="card dashboard-equal-card termin-position-panel w-100">
+      <div class="card dashboard-equal-card w-100">
         <div class="card-body">
           <div class="row mb-3 align-items-center">
             <div class="col">
@@ -515,7 +538,7 @@
     </div>
 
     <div class="col-xl-4 col-md-12 d-flex dashboard-section-gap">
-      <div class="card dashboard-equal-card w-100">
+      <div class="card dashboard-equal-card termin-position-panel w-100">
         <div class="card-body d-flex flex-column">
           <div class="row mb-3 align-items-center">
             <div class="col">

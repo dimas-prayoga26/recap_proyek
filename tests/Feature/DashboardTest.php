@@ -235,7 +235,13 @@ class DashboardTest extends TestCase
             ->assertSee('Pintu Utama Aluminium')
             ->assertSee('overflow: hidden', false)
             ->assertSee('flex-direction: column', false)
+            ->assertSee('height: 0', false)
+            ->assertSee('max-height: 552px', false)
             ->assertSee('flex-direction: row', false);
+        $this->assertMatchesRegularExpression(
+            '/card dashboard-equal-card termin-position-panel w-100">[\s\S]*Termin Aktivitas/',
+            $response->getContent(),
+        );
     }
 
     public function test_dashboard_receipt_preview_uses_relative_storage_url_for_modal(): void
