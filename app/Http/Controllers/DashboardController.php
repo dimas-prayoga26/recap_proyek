@@ -260,6 +260,7 @@ class DashboardController extends Controller
                 return [
                     'date' => $transaction->recorded_at?->format('d/m/Y') ?? '-',
                     'day' => $this->dayName($transaction->recorded_at),
+                    'recorded_at' => $this->formatRecordedDate($transaction->recorded_at),
                     'name' => $transaction->workItem?->name ?? '-',
                     'project_name' => $project->name,
                     'vendor' => $transaction->vendor?->name ?? $transaction->workItem?->vendor?->name ?? '-',
@@ -278,6 +279,15 @@ class DashboardController extends Controller
         }
 
         return Storage::disk($attachment->disk)->url($attachment->path);
+    }
+
+    private function formatRecordedDate(?CarbonInterface $date): string
+    {
+        if (! $date) {
+            return '-';
+        }
+
+        return $this->dayName($date).', '.$date->format('Y-m-d');
     }
 
     private function dayName(?CarbonInterface $date): string

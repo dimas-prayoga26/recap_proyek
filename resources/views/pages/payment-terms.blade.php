@@ -133,7 +133,18 @@
       max-height: min(52vh, 400px);
       max-width: 100%;
       object-fit: contain;
+      transition: width 0.15s ease;
       width: auto;
+    }
+
+    .payment-detail-preview img.is-zoomed {
+      cursor: grab;
+      max-height: none;
+      max-width: none;
+    }
+
+    .payment-detail-preview img.is-zoomed.is-dragging {
+      cursor: grabbing;
     }
 
     .payment-detail-preview iframe {
@@ -282,6 +293,7 @@
                               data-bs-target="#payment-detail-modal"
                               data-payment-number="{{ $payment['detail']['payment_number'] }}"
                               data-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                              data-recorded-at="{{ $payment['detail']['recorded_at'] }}"
                               data-notes="{{ $payment['detail']['notes'] }}"
                               data-receipt-url="{{ $payment['detail']['receipt_url'] }}"
                               data-receipt-mime="{{ $payment['detail']['receipt_mime'] }}"
@@ -326,6 +338,10 @@
           <div class="payment-detail-line">
             <span>Nominal</span>
             <strong id="payment-detail-amount">-</strong>
+          </div>
+          <div class="payment-detail-line">
+            <span>Tanggal Pencatatan</span>
+            <strong id="payment-detail-date">-</strong>
           </div>
           <div class="py-3">
             <span class="d-block text-muted fs-6 mb-2">Bukti Pembayaran</span>
@@ -398,23 +414,59 @@
 
       const paymentDetailTitle = document.querySelector('#payment-detail-title');
       const paymentDetailAmount = document.querySelector('#payment-detail-amount');
+      const paymentDetailDate = document.querySelector('#payment-detail-date');
       const paymentDetailNotes = document.querySelector('#payment-detail-notes');
       const paymentDetailEmpty = document.querySelector('#payment-detail-empty');
+      const paymentDetailPreview = document.querySelector('.payment-detail-preview');
       const paymentDetailImage = document.querySelector('#payment-detail-image');
       const paymentDetailPdf = document.querySelector('#payment-detail-pdf');
       const paymentDetailDownload = document.querySelector('#payment-detail-download');
       const paymentDetailDownloadText = paymentDetailDownload.querySelector('span');
+      let paymentDetailZoom = 1;
+      let isPaymentDetailDragging = false;
+      let paymentDetailDragStartX = 0;
+      let paymentDetailDragStartY = 0;
+      let paymentDetailDragScrollLeft = 0;
+      let paymentDetailDragScrollTop = 0;
+
+      function setPaymentDetailZoom(value, pointerEvent = null) {
+        const previousZoom = paymentDetailZoom;
+        const previewRect = paymentDetailPreview.getBoundingClientRect();
+        const pointerX = pointerEvent ? pointerEvent.clientX - previewRect.left : paymentDetailPreview.clientWidth / 2;
+        const pointerY = pointerEvent ? pointerEvent.clientY - previewRect.top : paymentDetailPreview.clientHeight / 2;
+        const scrollAnchorX = paymentDetailPreview.scrollLeft + pointerX;
+        const scrollAnchorY = paymentDetailPreview.scrollTop + pointerY;
+
+        paymentDetailZoom = Math.min(3, Math.max(1, value));
+        paymentDetailImage.classList.toggle('is-zoomed', paymentDetailZoom > 1);
+        paymentDetailImage.style.width = paymentDetailZoom > 1 ? (paymentDetailZoom * 100) + '%' : '';
+
+        if (paymentDetailZoom <= 1) {
+          paymentDetailImage.classList.remove('is-dragging');
+          isPaymentDetailDragging = false;
+        }
+
+        if (pointerEvent && previousZoom !== paymentDetailZoom) {
+          const zoomRatio = paymentDetailZoom / previousZoom;
+
+          paymentDetailPreview.scrollLeft = (scrollAnchorX * zoomRatio) - pointerX;
+          paymentDetailPreview.scrollTop = (scrollAnchorY * zoomRatio) - pointerY;
+        }
+      }
 
       function resetPaymentReceiptPreview() {
         paymentDetailEmpty.classList.add('d-none');
         paymentDetailImage.classList.add('d-none');
+        paymentDetailImage.classList.remove('is-zoomed', 'is-dragging');
         paymentDetailPdf.classList.add('d-none');
         paymentDetailDownload.classList.add('d-none');
         paymentDetailImage.removeAttribute('src');
         paymentDetailPdf.removeAttribute('src');
         paymentDetailImage.dataset.receiptName = '';
         paymentDetailImage.dataset.receiptUrl = '';
+        paymentDetailImage.style.width = '';
         paymentDetailDownload.href = '#';
+        setPaymentDetailZoom(1);
       }
 
       function showPaymentReceiptDownload(receiptName) {
@@ -452,6 +504,7 @@
 
           paymentDetailTitle.textContent = 'Pembayaran ke-' + (button.dataset.paymentNumber || '-');
           paymentDetailAmount.textContent = button.dataset.amount || '-';
+          paymentDetailDate.textContent = button.dataset.recordedAt || '-';
           paymentDetailNotes.textContent = button.dataset.notes || '-';
           resetPaymentReceiptPreview();
 
@@ -480,6 +533,45 @@
 
           showPaymentReceiptFallback('Preview tidak tersedia untuk tipe file ini.', receiptName);
         });
+      });
+
+      paymentDetailPreview.addEventListener('wheel', function (event) {
+        if (paymentDetailImage.classList.contains('d-none')) {
+          return;
+        }
+
+        event.preventDefault();
+
+        setPaymentDetailZoom(paymentDetailZoom + (event.deltaY < 0 ? 0.15 : -0.15), event);
+      }, { passive: false });
+
+      paymentDetailPreview.addEventListener('mousedown', function (event) {
+        if (paymentDetailZoom <= 1 || paymentDetailImage.classList.contains('d-none')) {
+          return;
+        }
+
+        event.preventDefault();
+        isPaymentDetailDragging = true;
+        paymentDetailImage.classList.add('is-dragging');
+        paymentDetailDragStartX = event.pageX;
+        paymentDetailDragStartY = event.pageY;
+        paymentDetailDragScrollLeft = paymentDetailPreview.scrollLeft;
+        paymentDetailDragScrollTop = paymentDetailPreview.scrollTop;
+      });
+
+      window.addEventListener('mousemove', function (event) {
+        if (! isPaymentDetailDragging) {
+          return;
+        }
+
+        event.preventDefault();
+        paymentDetailPreview.scrollLeft = paymentDetailDragScrollLeft - (event.pageX - paymentDetailDragStartX);
+        paymentDetailPreview.scrollTop = paymentDetailDragScrollTop - (event.pageY - paymentDetailDragStartY);
+      });
+
+      window.addEventListener('mouseup', function () {
+        isPaymentDetailDragging = false;
+        paymentDetailImage.classList.remove('is-dragging');
       });
     });
   </script>

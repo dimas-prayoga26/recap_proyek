@@ -197,12 +197,45 @@
       max-height: min(56vh, 460px);
       max-width: 100%;
       object-fit: contain;
+      transition: width 0.15s ease;
       width: auto;
+    }
+
+    .receipt-modal-preview img.is-zoomed {
+      cursor: grab;
+      max-height: none;
+      max-width: none;
+    }
+
+    .receipt-modal-preview img.is-zoomed.is-dragging {
+      cursor: grabbing;
     }
 
     .receipt-modal-preview iframe {
       height: min(56vh, 460px);
       max-height: 460px;
+    }
+
+    .receipt-modal-meta {
+      align-items: center;
+      border-bottom: 1px solid #eef2f6;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      text-align: left;
+    }
+
+    .receipt-modal-meta span {
+      color: #697586;
+      font-size: 12px;
+    }
+
+    .receipt-modal-meta strong {
+      color: #202939;
+      font-size: 14px;
+      text-align: right;
     }
 
     .offer-summary-card .card-body {
@@ -592,6 +625,7 @@
                           data-receipt-url="{{ $transaction['receipt_url'] }}"
                           data-receipt-mime="{{ $transaction['receipt_mime'] }}"
                           data-receipt-title="{{ $transaction['name'] }}"
+                          data-receipt-date="{{ $transaction['recorded_at'] }}"
                         >
                           <i class="ti ti-photo"></i> Lihat
                         </button>
@@ -623,6 +657,10 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body text-center">
+          <div class="receipt-modal-meta">
+            <span>Tanggal Pencatatan</span>
+            <strong id="receipt-preview-date">-</strong>
+          </div>
           <div class="receipt-modal-preview">
             <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
             <iframe src="" id="receipt-preview-pdf" class="w-100 border rounded d-none" title="Bukti transaksi PDF"></iframe>
@@ -672,20 +710,97 @@
       const receiptPreviewPdf = document.querySelector('#receipt-preview-pdf');
       const receiptPreviewDownload = document.querySelector('#receipt-preview-download');
       const receiptPreviewTitle = document.querySelector('#receipt-preview-title');
+      const receiptPreviewDate = document.querySelector('#receipt-preview-date');
+      const receiptPreviewPanel = document.querySelector('.receipt-modal-preview');
+      let receiptPreviewZoom = 1;
+      let isReceiptPreviewDragging = false;
+      let receiptPreviewDragStartX = 0;
+      let receiptPreviewDragStartY = 0;
+      let receiptPreviewDragScrollLeft = 0;
+      let receiptPreviewDragScrollTop = 0;
+
+      function setReceiptPreviewZoom(value, pointerEvent = null) {
+        const previousZoom = receiptPreviewZoom;
+        const panelRect = receiptPreviewPanel.getBoundingClientRect();
+        const pointerX = pointerEvent ? pointerEvent.clientX - panelRect.left : receiptPreviewPanel.clientWidth / 2;
+        const pointerY = pointerEvent ? pointerEvent.clientY - panelRect.top : receiptPreviewPanel.clientHeight / 2;
+        const scrollAnchorX = receiptPreviewPanel.scrollLeft + pointerX;
+        const scrollAnchorY = receiptPreviewPanel.scrollTop + pointerY;
+
+        receiptPreviewZoom = Math.min(3, Math.max(1, value));
+        receiptPreviewImage.classList.toggle('is-zoomed', receiptPreviewZoom > 1);
+        receiptPreviewImage.style.width = receiptPreviewZoom > 1 ? (receiptPreviewZoom * 100) + '%' : '';
+
+        if (receiptPreviewZoom <= 1) {
+          receiptPreviewImage.classList.remove('is-dragging');
+          isReceiptPreviewDragging = false;
+        }
+
+        if (pointerEvent && previousZoom !== receiptPreviewZoom) {
+          const zoomRatio = receiptPreviewZoom / previousZoom;
+
+          receiptPreviewPanel.scrollLeft = (scrollAnchorX * zoomRatio) - pointerX;
+          receiptPreviewPanel.scrollTop = (scrollAnchorY * zoomRatio) - pointerY;
+        }
+      }
 
       document.querySelectorAll('.receipt-action').forEach(function (button) {
         button.addEventListener('click', function () {
-          const isPdf = button.dataset.receiptMime === 'application/pdf';
+          const receiptMime = (button.dataset.receiptMime || '').toLowerCase();
+          const receiptPath = (button.dataset.receiptUrl || '').toLowerCase();
+          const isPdf = receiptMime === 'application/pdf' || receiptPath.endsWith('.pdf');
+          const isImage = receiptMime.startsWith('image/') || /\.(jpe?g|png)$/i.test(receiptPath);
 
-          receiptPreviewImage.classList.toggle('d-none', isPdf);
+          setReceiptPreviewZoom(1);
+          receiptPreviewImage.classList.toggle('d-none', !isImage || isPdf);
           receiptPreviewPdf.classList.toggle('d-none', !isPdf);
           receiptPreviewDownload.classList.toggle('d-none', !isPdf);
 
-          receiptPreviewImage.src = isPdf ? '' : button.dataset.receiptUrl;
+          receiptPreviewImage.src = isImage && !isPdf ? button.dataset.receiptUrl : '';
           receiptPreviewPdf.src = isPdf ? button.dataset.receiptUrl : '';
           receiptPreviewDownload.href = button.dataset.receiptUrl;
           receiptPreviewTitle.textContent = 'Bukti Transaksi - ' + (button.dataset.receiptTitle || '');
+          receiptPreviewDate.textContent = button.dataset.receiptDate || '-';
         });
+      });
+
+      receiptPreviewPanel.addEventListener('wheel', function (event) {
+        if (receiptPreviewImage.classList.contains('d-none')) {
+          return;
+        }
+
+        event.preventDefault();
+
+        setReceiptPreviewZoom(receiptPreviewZoom + (event.deltaY < 0 ? 0.15 : -0.15), event);
+      }, { passive: false });
+
+      receiptPreviewPanel.addEventListener('mousedown', function (event) {
+        if (receiptPreviewZoom <= 1 || receiptPreviewImage.classList.contains('d-none')) {
+          return;
+        }
+
+        event.preventDefault();
+        isReceiptPreviewDragging = true;
+        receiptPreviewImage.classList.add('is-dragging');
+        receiptPreviewDragStartX = event.pageX;
+        receiptPreviewDragStartY = event.pageY;
+        receiptPreviewDragScrollLeft = receiptPreviewPanel.scrollLeft;
+        receiptPreviewDragScrollTop = receiptPreviewPanel.scrollTop;
+      });
+
+      window.addEventListener('mousemove', function (event) {
+        if (! isReceiptPreviewDragging) {
+          return;
+        }
+
+        event.preventDefault();
+        receiptPreviewPanel.scrollLeft = receiptPreviewDragScrollLeft - (event.pageX - receiptPreviewDragStartX);
+        receiptPreviewPanel.scrollTop = receiptPreviewDragScrollTop - (event.pageY - receiptPreviewDragStartY);
+      });
+
+      window.addEventListener('mouseup', function () {
+        isReceiptPreviewDragging = false;
+        receiptPreviewImage.classList.remove('is-dragging');
       });
 
       new ApexCharts(document.querySelector('#cashflow-chart'), {

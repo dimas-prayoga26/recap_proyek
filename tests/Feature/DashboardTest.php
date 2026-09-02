@@ -215,6 +215,14 @@ class DashboardTest extends TestCase
             ->assertSee('data-bs-target="#receipt-preview-modal"', false)
             ->assertSee('receipt-modal-preview', false)
             ->assertSee('max-height: min(62vh, 520px)', false)
+            ->assertSee('Tanggal Pencatatan')
+            ->assertSee('setReceiptPreviewZoom')
+            ->assertSee("addEventListener('wheel'", false)
+            ->assertSee('is-dragging')
+            ->assertDontSee('id="receipt-preview-zoom-controls"', false)
+            ->assertDontSee('id="receipt-preview-zoom-in"', false)
+            ->assertDontSee('id="receipt-preview-zoom-out"', false)
+            ->assertSee('data-receipt-date="Rabu, 2026-09-02"', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/bukti-dashboard.jpg"', false)
             ->assertDontSee('127.0.0.1:8001/storage');
     }

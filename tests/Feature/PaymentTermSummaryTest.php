@@ -179,7 +179,15 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('<i class="ti ti-eye"></i>', false)
             ->assertSee('payment-detail-preview', false)
             ->assertSee('max-height: min(58vh, 460px)', false)
+            ->assertSee('Tanggal Pencatatan')
+            ->assertSee('setPaymentDetailZoom')
+            ->assertSee("addEventListener('wheel'", false)
+            ->assertSee('is-dragging')
+            ->assertDontSee('id="payment-detail-zoom-controls"', false)
+            ->assertDontSee('id="payment-detail-zoom-in"', false)
+            ->assertDontSee('id="payment-detail-zoom-out"', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
+            ->assertSee('data-recorded-at="Sabtu, 2026-08-29"', false)
             ->assertSee('data-notes="Allocation note"', false)
             ->assertSee('data-receipt-mime=""', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/kwitansi-test.pdf"', false)
@@ -191,8 +199,7 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('data-vendor-name=', false)
             ->assertDontSee('id="payment-detail-work"', false)
             ->assertDontSee('id="payment-detail-vendor"', false)
-            ->assertDontSee('id="payment-detail-type"', false)
-            ->assertDontSee('id="payment-detail-date"', false);
+            ->assertDontSee('id="payment-detail-type"', false);
     }
 
     /**

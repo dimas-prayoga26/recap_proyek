@@ -8,6 +8,7 @@ use App\Models\PaymentTerm;
 use App\Models\ProjectTransactionAttachment;
 use App\Models\Vendor;
 use App\Models\WorkItem;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -112,6 +113,7 @@ class PaymentTermController extends Controller
         return [
             'payment_number' => $term->payment_number,
             'amount' => (int) $term->amount,
+            'recorded_at' => $this->formatRecordedDate($transaction?->recorded_at ?? $term->paid_at),
             'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
             'receipt_url' => $attachment ? $this->attachmentUrl($attachment) : '',
             'receipt_mime' => $attachment?->mime_type ?? '',
@@ -126,6 +128,28 @@ class PaymentTermController extends Controller
         }
 
         return Storage::disk($attachment->disk)->url($attachment->path);
+    }
+
+    private function formatRecordedDate(?CarbonInterface $date): string
+    {
+        if (! $date) {
+            return '-';
+        }
+
+        return $this->dayName($date).', '.$date->format('Y-m-d');
+    }
+
+    private function dayName(CarbonInterface $date): string
+    {
+        return [
+            'Minggu',
+            'Senin',
+            'Selasa',
+            'Rabu',
+            'Kamis',
+            'Jumat',
+            'Sabtu',
+        ][$date->dayOfWeek];
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array
