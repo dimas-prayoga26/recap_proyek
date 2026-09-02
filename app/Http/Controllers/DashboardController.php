@@ -49,7 +49,7 @@ class DashboardController extends Controller
                 'balance_usd' => number_format(max(0, $balance) / $usdToIdrRate, 0, ',', '.'),
             ],
             'chartSeries' => $this->chartSeries($activeProject),
-            'paymentGroup' => $this->paymentGroupSummary($activeProject),
+            'paymentGroups' => $this->paymentGroupSummaries($activeProject),
             'recentTransactions' => $this->recentTransactions($activeProject),
         ]);
     }
@@ -170,31 +170,22 @@ class DashboardController extends Controller
         return compact('income', 'expense', 'balance');
     }
 
-    private function paymentGroupSummary(?Project $project): ?array
+    private function paymentGroupSummaries(?Project $project): Collection
     {
         if (! $project) {
-            return null;
+            return collect();
         }
 
-        $latestTransaction = ProjectTransaction::query()
-            ->with(['paymentGroup.terms', 'paymentGroup.workItem.vendor'])
+        return PaymentGroup::query()
+            ->with(['terms', 'workItem.vendor'])
             ->whereBelongsTo($project)
-            ->whereNotNull('payment_group_id')
-            ->latest('recorded_at')
-            ->latest('id')
-            ->first();
+            ->latest()
+            ->get()
+            ->map(fn (PaymentGroup $paymentGroup): array => $this->paymentGroupSummary($paymentGroup));
+    }
 
-        $paymentGroup = $latestTransaction?->paymentGroup
-            ?? PaymentGroup::query()
-                ->with(['terms', 'workItem.vendor'])
-                ->whereBelongsTo($project)
-                ->latest()
-                ->first();
-
-        if (! $paymentGroup) {
-            return null;
-        }
-
+    private function paymentGroupSummary(PaymentGroup $paymentGroup): array
+    {
         $totalAmount = (int) ($paymentGroup->offer_rupiah_snapshot ?? $paymentGroup->total_amount ?? 0);
         $paidTerms = $paymentGroup->terms->count();
         $paidAmount = (int) $paymentGroup->terms->sum('amount');

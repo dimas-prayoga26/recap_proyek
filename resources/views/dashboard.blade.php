@@ -71,6 +71,16 @@
       transform: translateY(-1px);
     }
 
+    .termin-position-scroll {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
     .termin-position-alias {
       font-size: 13px;
       font-weight: 700;
@@ -312,7 +322,7 @@
 
       .termin-position-scroll {
         -webkit-overflow-scrolling: touch;
-        display: flex;
+        flex-direction: row;
         gap: 12px;
         margin-left: -2px;
         margin-right: -2px;
@@ -496,7 +506,7 @@
             </div>
             <div class="col-auto">
               <a
-                href="{{ $paymentGroup && $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
+                href="{{ route('termin-pembayaran.index') }}"
                 class="btn btn-sm btn-light-primary"
               >
                 Detail
@@ -504,39 +514,41 @@
             </div>
           </div>
 
-          @if ($paymentGroup)
-            @php
-              $terminColor = $paymentGroup['is_paid_off'] ? 'success' : 'warning';
-            @endphp
+          @if ($paymentGroups->isNotEmpty())
             <div class="termin-position-scroll">
-              <a
-                href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
-                class="rounded bg-light-{{ $terminColor }} p-3 d-block text-decoration-none termin-position-card {{ $paymentGroup['is_paid_off'] ? 'is-paid-off' : '' }}"
-              >
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                  <div class="d-flex align-items-center">
-                    <div class="avtar avtar-lg bg-{{ $terminColor }} text-white termin-position-alias">{{ $paymentGroup['work_item_alias'] }}</div>
-                    <div class="ms-2">
-                      <h5 class="mb-0">{{ $paymentGroup['work_item_name'] }}</h5>
-                      <small class="text-muted">{{ $paymentGroup['vendor_name'] }}</small>
+              @foreach ($paymentGroups as $paymentGroup)
+                @php
+                  $terminColor = $paymentGroup['is_paid_off'] ? 'success' : 'warning';
+                @endphp
+                <a
+                  href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
+                  class="rounded bg-light-{{ $terminColor }} p-3 d-block text-decoration-none termin-position-card {{ $paymentGroup['is_paid_off'] ? 'is-paid-off' : '' }}"
+                >
+                  <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center">
+                      <div class="avtar avtar-lg bg-{{ $terminColor }} text-white termin-position-alias">{{ $paymentGroup['work_item_alias'] }}</div>
+                      <div class="ms-2">
+                        <h5 class="mb-0">{{ $paymentGroup['work_item_name'] }}</h5>
+                        <small class="text-muted">{{ $paymentGroup['vendor_name'] }}</small>
+                      </div>
+                    </div>
+                    <span class="badge bg-{{ $terminColor }}">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
+                  </div>
+                  <div class="progress mb-2" style="height: 8px">
+                    <div class="progress-bar bg-{{ $terminColor }}" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                  <div class="termin-position-summary">
+                    <div class="termin-position-summary-item">
+                      <span>Dibayar</span>
+                      <strong class="text-success">{{ $paymentGroup['paid_amount'] }}</strong>
+                    </div>
+                    <div class="termin-position-summary-item text-end">
+                      <span>Sisa</span>
+                      <strong class="text-primary">{{ $paymentGroup['remaining_amount'] }}</strong>
                     </div>
                   </div>
-                  <span class="badge bg-{{ $terminColor }}">{{ $paymentGroup['paid_terms'] }}/{{ $paymentGroup['total_terms'] }}</span>
-                </div>
-                <div class="progress mb-2" style="height: 8px">
-                  <div class="progress-bar bg-{{ $terminColor }}" role="progressbar" style="width: {{ $paymentGroup['progress'] }}%" aria-valuenow="{{ $paymentGroup['progress'] }}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <div class="termin-position-summary">
-                  <div class="termin-position-summary-item">
-                    <span>Dibayar</span>
-                    <strong class="text-success">{{ $paymentGroup['paid_amount'] }}</strong>
-                  </div>
-                  <div class="termin-position-summary-item text-end">
-                    <span>Sisa</span>
-                    <strong class="text-primary">{{ $paymentGroup['remaining_amount'] }}</strong>
-                  </div>
-                </div>
-              </a>
+                </a>
+              @endforeach
             </div>
           @else
             <div class="termin-position-scroll">

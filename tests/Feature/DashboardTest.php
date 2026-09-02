@@ -170,6 +170,69 @@ class DashboardTest extends TestCase
             ->assertSee('progress-bar bg-success', false);
     }
 
+    public function test_dashboard_shows_all_payment_groups_in_position_scroll(): void
+    {
+        Cache::put('exchange-rate.usd-idr', 17000, 300);
+
+        $project = Project::create([
+            'name' => 'Project Banyak Termin Dashboard',
+            'slug' => 'project-banyak-termin-dashboard-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+        $firstWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Belanja Tambahan Marmer',
+            'offer_rupiah' => 4972800,
+        ]);
+        $secondWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Pintu Utama Aluminium',
+            'offer_rupiah' => 325557023,
+        ]);
+
+        $firstPaymentGroup = PaymentGroup::create([
+            'project_id' => $project->id,
+            'work_item_id' => $firstWorkItem->id,
+            'code' => 'Termin-'.$firstWorkItem->id,
+            'name' => $firstWorkItem->name,
+            'total_amount' => 4972800,
+            'offer_rupiah_snapshot' => 4972800,
+            'total_terms' => 1,
+            'paid_terms' => 1,
+            'status' => 'lunas',
+        ]);
+        PaymentTerm::create([
+            'payment_group_id' => $firstPaymentGroup->id,
+            'payment_number' => 1,
+            'amount' => 4972800,
+            'paid_at' => '2026-09-02',
+        ]);
+        PaymentGroup::create([
+            'project_id' => $project->id,
+            'work_item_id' => $secondWorkItem->id,
+            'code' => 'Termin-'.$secondWorkItem->id,
+            'name' => $secondWorkItem->name,
+            'total_amount' => 325557023,
+            'offer_rupiah_snapshot' => 325557023,
+            'total_terms' => 2,
+            'paid_terms' => 0,
+            'status' => 'belum_lunas',
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response
+            ->assertSee('termin-position-scroll', false)
+            ->assertSee('Belanja Tambahan Marmer')
+            ->assertSee('Pintu Utama Aluminium')
+            ->assertSee('flex-direction: column', false)
+            ->assertSee('flex-direction: row', false);
+    }
+
     public function test_dashboard_receipt_preview_uses_relative_storage_url_for_modal(): void
     {
         config(['filesystems.disks.public.url' => 'http://127.0.0.1:8001/storage']);
