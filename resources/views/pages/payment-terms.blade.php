@@ -127,6 +127,11 @@
       padding: 12px;
     }
 
+    .payment-detail-preview.is-zoomed {
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
     .payment-detail-preview img {
       display: block;
       height: auto;
@@ -134,6 +139,7 @@
       max-width: 100%;
       object-fit: contain;
       transition: width 0.15s ease;
+      user-select: none;
       width: auto;
     }
 
@@ -437,13 +443,16 @@
         const scrollAnchorX = paymentDetailPreview.scrollLeft + pointerX;
         const scrollAnchorY = paymentDetailPreview.scrollTop + pointerY;
 
-        paymentDetailZoom = Math.min(3, Math.max(1, value));
+        paymentDetailZoom = Math.min(5, Math.max(1, value));
+        paymentDetailPreview.classList.toggle('is-zoomed', paymentDetailZoom > 1);
         paymentDetailImage.classList.toggle('is-zoomed', paymentDetailZoom > 1);
         paymentDetailImage.style.width = paymentDetailZoom > 1 ? (paymentDetailZoom * 100) + '%' : '';
 
         if (paymentDetailZoom <= 1) {
           paymentDetailImage.classList.remove('is-dragging');
           isPaymentDetailDragging = false;
+          paymentDetailPreview.scrollLeft = 0;
+          paymentDetailPreview.scrollTop = 0;
         }
 
         if (pointerEvent && previousZoom !== paymentDetailZoom) {
@@ -457,6 +466,7 @@
       function resetPaymentReceiptPreview() {
         paymentDetailEmpty.classList.add('d-none');
         paymentDetailImage.classList.add('d-none');
+        paymentDetailPreview.classList.remove('is-zoomed');
         paymentDetailImage.classList.remove('is-zoomed', 'is-dragging');
         paymentDetailPdf.classList.add('d-none');
         paymentDetailDownload.classList.add('d-none');

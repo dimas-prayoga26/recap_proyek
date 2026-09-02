@@ -256,6 +256,11 @@
       padding: 12px;
     }
 
+    .receipt-modal-preview.is-zoomed {
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
     .receipt-modal-preview img {
       display: block;
       height: auto;
@@ -263,6 +268,7 @@
       max-width: 100%;
       object-fit: contain;
       transition: width 0.15s ease;
+      user-select: none;
       width: auto;
     }
 
@@ -847,13 +853,16 @@
         const scrollAnchorX = receiptPreviewPanel.scrollLeft + pointerX;
         const scrollAnchorY = receiptPreviewPanel.scrollTop + pointerY;
 
-        receiptPreviewZoom = Math.min(3, Math.max(1, value));
+        receiptPreviewZoom = Math.min(5, Math.max(1, value));
+        receiptPreviewPanel.classList.toggle('is-zoomed', receiptPreviewZoom > 1);
         receiptPreviewImage.classList.toggle('is-zoomed', receiptPreviewZoom > 1);
         receiptPreviewImage.style.width = receiptPreviewZoom > 1 ? (receiptPreviewZoom * 100) + '%' : '';
 
         if (receiptPreviewZoom <= 1) {
           receiptPreviewImage.classList.remove('is-dragging');
           isReceiptPreviewDragging = false;
+          receiptPreviewPanel.scrollLeft = 0;
+          receiptPreviewPanel.scrollTop = 0;
         }
 
         if (pointerEvent && previousZoom !== receiptPreviewZoom) {

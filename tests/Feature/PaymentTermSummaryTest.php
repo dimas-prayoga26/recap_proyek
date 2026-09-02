@@ -181,6 +181,8 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('max-height: min(58vh, 460px)', false)
             ->assertSee('Tanggal Pencatatan')
             ->assertSee('setPaymentDetailZoom')
+            ->assertSee('payment-detail-preview.is-zoomed', false)
+            ->assertSee('Math.min(5', false)
             ->assertSee("addEventListener('wheel'", false)
             ->assertSee('is-dragging')
             ->assertDontSee('id="payment-detail-zoom-controls"', false)

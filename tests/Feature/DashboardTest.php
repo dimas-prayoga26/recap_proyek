@@ -326,6 +326,8 @@ class DashboardTest extends TestCase
             ->assertSee('max-height: min(62vh, 520px)', false)
             ->assertSee('Tanggal Pencatatan')
             ->assertSee('setReceiptPreviewZoom')
+            ->assertSee('receipt-modal-preview.is-zoomed', false)
+            ->assertSee('Math.min(5', false)
             ->assertSee("addEventListener('wheel'", false)
             ->assertSee('is-dragging')
             ->assertDontSee('id="receipt-preview-zoom-controls"', false)
