@@ -214,7 +214,7 @@ class DashboardTest extends TestCase
             'amount' => 4972800,
             'paid_at' => '2026-09-02',
         ]);
-        PaymentGroup::create([
+        $secondPaymentGroup = PaymentGroup::create([
             'project_id' => $project->id,
             'work_item_id' => $secondWorkItem->id,
             'code' => 'Termin-'.$secondWorkItem->id,
@@ -225,12 +225,39 @@ class DashboardTest extends TestCase
             'paid_terms' => 0,
             'status' => 'belum_lunas',
         ]);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Pembayaran Termin Dashboard', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $firstWorkItem->id,
+            'payment_group_id' => $firstPaymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 4972800,
+            'recorded_at' => '2026-09-01',
+        ]);
+        ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $secondWorkItem->id,
+            'payment_group_id' => $secondPaymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 50000000,
+            'recorded_at' => '2026-09-02',
+        ]);
 
         $response = $this->get(route('dashboard'));
 
         $response
             ->assertSee('termin-position-scroll', false)
             ->assertSee('termin-position-panel', false)
+            ->assertSee('id="termin-position-search"', false)
+            ->assertSee('data-termin-card', false)
+            ->assertSee('data-termin-search=', false)
+            ->assertSee('Termin tidak ditemukan.')
+            ->assertDontSee('>Detail<', false)
             ->assertSee('Belanja Tambahan Marmer')
             ->assertSee('Pintu Utama Aluminium')
             ->assertSee('overflow: hidden', false)
@@ -240,6 +267,14 @@ class DashboardTest extends TestCase
             ->assertSee('flex-direction: row', false);
         $this->assertMatchesRegularExpression(
             '/card dashboard-equal-card termin-position-panel w-100">[\s\S]*Termin Aktivitas/',
+            $response->getContent(),
+        );
+        $this->assertMatchesRegularExpression(
+            '/Termin Aktivitas[\s\S]*Pintu Utama Aluminium[\s\S]*Belanja Tambahan Marmer[\s\S]*Transaksi Terbaru/',
+            $response->getContent(),
+        );
+        $this->assertMatchesRegularExpression(
+            '/Transaksi Terbaru[\s\S]*Pintu Utama Aluminium[\s\S]*Belanja Tambahan Marmer/',
             $response->getContent(),
         );
     }

@@ -179,7 +179,24 @@ class DashboardController extends Controller
         return PaymentGroup::query()
             ->with(['terms', 'workItem.vendor'])
             ->whereBelongsTo($project)
-            ->latest()
+            ->addSelect([
+                'latest_transaction_at' => ProjectTransaction::query()
+                    ->select('recorded_at')
+                    ->whereColumn('payment_group_id', 'payment_groups.id')
+                    ->latest('recorded_at')
+                    ->latest('id')
+                    ->limit(1),
+                'latest_transaction_id' => ProjectTransaction::query()
+                    ->select('id')
+                    ->whereColumn('payment_group_id', 'payment_groups.id')
+                    ->latest('recorded_at')
+                    ->latest('id')
+                    ->limit(1),
+            ])
+            ->orderByDesc('latest_transaction_at')
+            ->orderByDesc('latest_transaction_id')
+            ->latest('payment_groups.created_at')
+            ->latest('payment_groups.id')
             ->get()
             ->map(fn (PaymentGroup $paymentGroup): array => $this->paymentGroupSummary($paymentGroup));
     }

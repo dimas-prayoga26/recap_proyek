@@ -88,6 +88,36 @@
       flex: 0 0 auto;
     }
 
+    .termin-position-search {
+      position: relative;
+      width: 190px;
+    }
+
+    .termin-position-search i {
+      color: #697586;
+      font-size: 16px;
+      left: 12px;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .termin-position-search input {
+      border: 1px solid #d9e2ec;
+      border-radius: 8px;
+      font-size: 12px;
+      height: 34px;
+      padding: 7px 10px 7px 34px;
+      width: 100%;
+    }
+
+    .termin-position-empty-search {
+      color: #697586;
+      font-size: 13px;
+      padding: 18px 10px;
+      text-align: center;
+    }
+
     .termin-position-card:hover {
       box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
       transform: translateY(-1px);
@@ -358,6 +388,18 @@
         overflow: visible;
       }
 
+      .termin-position-panel .card-body > .row {
+        gap: 10px;
+      }
+
+      .termin-position-panel .card-body > .row .col-auto {
+        width: 100%;
+      }
+
+      .termin-position-search {
+        width: 100%;
+      }
+
       .termin-position-scroll {
         -webkit-overflow-scrolling: touch;
         flex: 0 0 auto;
@@ -546,12 +588,10 @@
               <h4 class="mb-0">Termin Aktivitas</h4>
             </div>
             <div class="col-auto">
-              <a
-                href="{{ route('termin-pembayaran.index') }}"
-                class="btn btn-sm btn-light-primary"
-              >
-                Detail
-              </a>
+              <div class="termin-position-search">
+                <i class="ti ti-search"></i>
+                <input type="search" id="termin-position-search" placeholder="Cari termin..." aria-label="Cari termin aktivitas" />
+              </div>
             </div>
           </div>
 
@@ -564,6 +604,8 @@
                 <a
                   href="{{ $paymentGroup['work_item_id'] ? route('uang-keluar.index', ['work_item_id' => $paymentGroup['work_item_id']]) : route('termin-pembayaran.index') }}"
                   class="rounded bg-light-{{ $terminColor }} p-3 d-block text-decoration-none termin-position-card {{ $paymentGroup['is_paid_off'] ? 'is-paid-off' : '' }}"
+                  data-termin-card
+                  data-termin-search="{{ \Illuminate\Support\Str::lower($paymentGroup['work_item_name'].' '.$paymentGroup['vendor_name'].' '.$paymentGroup['work_item_alias']) }}"
                 >
                   <div class="d-flex align-items-center justify-content-between mb-3">
                     <div class="d-flex align-items-center">
@@ -590,6 +632,7 @@
                   </div>
                 </a>
               @endforeach
+              <div class="termin-position-empty-search d-none" id="termin-position-empty-search">Termin tidak ditemukan.</div>
             </div>
           @else
             <div class="termin-position-scroll">
@@ -737,6 +780,9 @@
       const chartSeries = @json($chartSeries);
       const offerSummaryTotal = document.querySelector('#offer-summary-total');
       const offerCurrencyButtons = document.querySelectorAll('[data-offer-currency]');
+      const terminPositionSearch = document.querySelector('#termin-position-search');
+      const terminPositionCards = document.querySelectorAll('[data-termin-card]');
+      const terminPositionEmptySearch = document.querySelector('#termin-position-empty-search');
 
       function updateExportLinks() {
         const selectedProject = activeProjectInput.value;
@@ -758,6 +804,27 @@
           });
         });
       });
+
+      if (terminPositionSearch) {
+        terminPositionSearch.addEventListener('input', function () {
+          const keyword = terminPositionSearch.value.trim().toLowerCase();
+          let visibleCount = 0;
+
+          terminPositionCards.forEach(function (card) {
+            const isVisible = !keyword || (card.dataset.terminSearch || '').includes(keyword);
+
+            card.classList.toggle('d-none', !isVisible);
+
+            if (isVisible) {
+              visibleCount += 1;
+            }
+          });
+
+          if (terminPositionEmptySearch) {
+            terminPositionEmptySearch.classList.toggle('d-none', visibleCount > 0 || !keyword);
+          }
+        });
+      }
 
       const receiptPreviewImage = document.querySelector('#receipt-preview-image');
       const receiptPreviewPdf = document.querySelector('#receipt-preview-pdf');
