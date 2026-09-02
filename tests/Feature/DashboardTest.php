@@ -309,6 +309,7 @@ class DashboardTest extends TestCase
             'type' => 'keluar',
             'amount' => 2500000,
             'recorded_at' => '2026-09-02',
+            'notes' => 'Catatan bukti dashboard',
         ]);
         $transaction->attachments()->create([
             'disk' => 'public',
@@ -325,6 +326,8 @@ class DashboardTest extends TestCase
             ->assertSee('receipt-modal-preview', false)
             ->assertSee('max-height: min(62vh, 520px)', false)
             ->assertSee('Tanggal Pencatatan')
+            ->assertSee('Nominal')
+            ->assertSee('Notes')
             ->assertSee('setReceiptPreviewZoom')
             ->assertSee('receipt-modal-preview.is-zoomed', false)
             ->assertSee('Math.min(5', false)
@@ -334,6 +337,8 @@ class DashboardTest extends TestCase
             ->assertDontSee('id="receipt-preview-zoom-in"', false)
             ->assertDontSee('id="receipt-preview-zoom-out"', false)
             ->assertSee('data-receipt-date="Rabu, 2026-09-02"', false)
+            ->assertSee('data-receipt-amount="- Rp 2.500.000"', false)
+            ->assertSee('data-receipt-notes="Catatan bukti dashboard"', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/bukti-dashboard.jpg"', false)
             ->assertDontSee('127.0.0.1:8001/storage');
     }

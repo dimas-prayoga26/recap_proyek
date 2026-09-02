@@ -274,6 +274,7 @@ class DashboardController extends Controller
                     'vendor' => $transaction->vendor?->name ?? $transaction->workItem?->vendor?->name ?? '-',
                     'type' => $transaction->type,
                     'amount' => $this->formatRupiah($transaction->amount),
+                    'notes' => $transaction->notes ?: '-',
                     'receipt_url' => $attachment ? $this->attachmentUrl($attachment) : null,
                     'receipt_mime' => $attachment?->mime_type,
                 ];

@@ -287,26 +287,38 @@
       max-height: 460px;
     }
 
-    .receipt-modal-meta {
-      align-items: center;
+    .receipt-modal-details {
       border-bottom: 1px solid #eef2f6;
-      display: flex;
-      gap: 16px;
-      justify-content: space-between;
+      display: grid;
+      gap: 10px;
       margin-bottom: 14px;
       padding-bottom: 12px;
       text-align: left;
     }
 
+    .receipt-modal-meta {
+      align-items: flex-start;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+
     .receipt-modal-meta span {
       color: #697586;
+      flex: 0 0 auto;
       font-size: 12px;
     }
 
     .receipt-modal-meta strong {
       color: #202939;
       font-size: 14px;
+      overflow-wrap: anywhere;
       text-align: right;
+    }
+
+    .receipt-modal-notes {
+      max-width: 280px;
+      white-space: pre-wrap;
     }
 
     .offer-summary-card .card-body {
@@ -728,6 +740,8 @@
                           data-receipt-mime="{{ $transaction['receipt_mime'] }}"
                           data-receipt-title="{{ $transaction['name'] }}"
                           data-receipt-date="{{ $transaction['recorded_at'] }}"
+                          data-receipt-amount="{{ ($isIncomeTransaction ? '+ ' : '- ') . $transaction['amount'] }}"
+                          data-receipt-notes="{{ $transaction['notes'] }}"
                         >
                           <i class="ti ti-photo"></i> Lihat
                         </button>
@@ -759,9 +773,19 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body text-center">
-          <div class="receipt-modal-meta">
-            <span>Tanggal Pencatatan</span>
-            <strong id="receipt-preview-date">-</strong>
+          <div class="receipt-modal-details">
+            <div class="receipt-modal-meta">
+              <span>Tanggal Pencatatan</span>
+              <strong id="receipt-preview-date">-</strong>
+            </div>
+            <div class="receipt-modal-meta">
+              <span>Nominal</span>
+              <strong id="receipt-preview-amount">-</strong>
+            </div>
+            <div class="receipt-modal-meta">
+              <span>Notes</span>
+              <strong id="receipt-preview-notes" class="receipt-modal-notes">-</strong>
+            </div>
           </div>
           <div class="receipt-modal-preview">
             <img src="" id="receipt-preview-image" class="img-fluid rounded" alt="Bukti transaksi" />
@@ -837,6 +861,8 @@
       const receiptPreviewDownload = document.querySelector('#receipt-preview-download');
       const receiptPreviewTitle = document.querySelector('#receipt-preview-title');
       const receiptPreviewDate = document.querySelector('#receipt-preview-date');
+      const receiptPreviewAmount = document.querySelector('#receipt-preview-amount');
+      const receiptPreviewNotes = document.querySelector('#receipt-preview-notes');
       const receiptPreviewPanel = document.querySelector('.receipt-modal-preview');
       let receiptPreviewZoom = 1;
       let isReceiptPreviewDragging = false;
@@ -890,6 +916,8 @@
           receiptPreviewDownload.href = button.dataset.receiptUrl;
           receiptPreviewTitle.textContent = 'Bukti Transaksi - ' + (button.dataset.receiptTitle || '');
           receiptPreviewDate.textContent = button.dataset.receiptDate || '-';
+          receiptPreviewAmount.textContent = button.dataset.receiptAmount || '-';
+          receiptPreviewNotes.textContent = button.dataset.receiptNotes || '-';
         });
       });
 
