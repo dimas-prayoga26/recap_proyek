@@ -66,6 +66,7 @@ class PaymentTermController extends Controller
             ? $allRows->filter(fn (array $row) => $row['summary']['total_terms'] === (int) $filters['terms'])->values()
             : $allRows;
         $paymentTotals = [
+            'offer' => (int) $rows->sum(fn (array $row): int => (int) $row['summary']['offer']),
             'paid' => (int) $rows->sum(fn (array $row): int => (int) $row['summary']['paid']),
             'remaining' => (int) $rows->sum(fn (array $row): int => max(0, (int) $row['summary']['remaining'])),
             'row_count' => $rows->count(),
@@ -238,7 +239,20 @@ class PaymentTermController extends Controller
             return '-';
         }
 
-        return $date->format('d F Y');
+        return $this->dayName($date).', '.$date->format('d F Y');
+    }
+
+    private function dayName(CarbonInterface $date): string
+    {
+        return [
+            'Minggu',
+            'Senin',
+            'Selasa',
+            'Rabu',
+            'Kamis',
+            'Jumat',
+            'Sabtu',
+        ][$date->dayOfWeek];
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array

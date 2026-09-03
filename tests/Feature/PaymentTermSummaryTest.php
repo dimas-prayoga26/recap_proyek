@@ -73,15 +73,37 @@ class PaymentTermSummaryTest extends TestCase
         $response = $this->get(route('termin-pembayaran.index'));
 
         $response
+            ->assertSee('data-summary-card="total"', false)
             ->assertSee('data-summary-card="paid"', false)
             ->assertSee('data-summary-card="remaining"', false)
+            ->assertSee('Total Penawaran')
             ->assertSee('Total Sudah Dibayar')
             ->assertSee('Total Sisa Pembayaran')
+            ->assertSee('Rp 160.000.000')
             ->assertSee('Rp 110.000.000')
             ->assertSee('Rp 50.000.000')
             ->assertSee('Semua Vendor - 2 pekerjaan')
-            ->assertSee('Semua Vendor - belum lunas')
-            ->assertSee('class="col-12 col-md-3"', false);
+            ->assertSee('bg-light-warning text-warning', false)
+            ->assertSee('Belum Lunas')
+            ->assertSee('class="col-12 col-md-4"', false);
+    }
+
+    public function test_payment_recap_shows_lunas_badge_when_remaining_is_zero(): void
+    {
+        [$project, $paidOffWorkItem] = $this->workItemForActiveProject('Pekerjaan Summary Lunas Total');
+        $vendor = Vendor::create(['name' => 'Vendor Lunas Total']);
+        $paidOffWorkItem->update(['vendor_id' => $vendor->id]);
+        $this->paymentGroupFor($paidOffWorkItem, 1, payments: [1 => 80000000]);
+
+        $response = $this->get(route('termin-pembayaran.index', [
+            'vendor_id' => $vendor->id,
+        ]));
+
+        $response
+            ->assertSee('Rp 0')
+            ->assertSee('bg-light-success text-success', false)
+            ->assertSee('Lunas')
+            ->assertDontSee('Belum Lunas');
     }
 
     public function test_terms_filter_limits_rows_and_columns_to_selected_automatic_payment_count(): void
@@ -146,7 +168,8 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('Vendor Kanopi')
             ->assertSee('data-summary-vendor="Vendor Kanopi"', false)
             ->assertSee('Vendor Kanopi - 1 pekerjaan')
-            ->assertSee('Vendor Kanopi - belum lunas')
+            ->assertSee('bg-light-warning text-warning', false)
+            ->assertSee('Belum Lunas')
             ->assertDontSee('Pasang Lantai');
     }
 
@@ -231,7 +254,7 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-zoom-in"', false)
             ->assertDontSee('id="payment-detail-zoom-out"', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
-            ->assertSee('data-recorded-at="Sabtu, 2026-08-29"', false)
+            ->assertSee('data-recorded-at="Sabtu, 29 August 2026"', false)
             ->assertSee('data-notes="Allocation note"', false)
             ->assertSee('data-receipt-mime=""', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/kwitansi-test.pdf"', false)

@@ -36,6 +36,11 @@
       padding: 12px 14px;
     }
 
+    .term-summary-card.is-total {
+      background: #eef6ff;
+      border-color: #b6dcff;
+    }
+
     .term-summary-card.is-paid {
       background: #f0fdf4;
       border-color: #bbf7d0;
@@ -56,6 +61,10 @@
       height: 36px;
       justify-content: center;
       width: 36px;
+    }
+
+    .term-summary-card.is-total .term-summary-icon {
+      background: #2196f3;
     }
 
     .term-summary-card.is-paid .term-summary-icon {
@@ -381,7 +390,19 @@
           </form>
 
           <div class="row g-3 mb-4">
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-4">
+              <div class="term-summary-card is-total" data-summary-card="total" data-summary-vendor="{{ $selectedVendor?->name ?? 'Semua Vendor' }}">
+                <span class="term-summary-icon">
+                  <i class="ti ti-file-invoice"></i>
+                </span>
+                <div>
+                  <span class="term-summary-label">Total Penawaran</span>
+                  <strong class="term-summary-value">{{ $formatRupiah($paymentTotals['offer'] ?? 0) }}</strong>
+                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - {{ $paymentTotals['row_count'] ?? 0 }} pekerjaan</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
               <div class="term-summary-card is-paid" data-summary-card="paid" data-summary-vendor="{{ $selectedVendor?->name ?? 'Semua Vendor' }}">
                 <span class="term-summary-icon">
                   <i class="ti ti-cash-banknote"></i>
@@ -393,7 +414,7 @@
                 </div>
               </div>
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-4">
               <div class="term-summary-card is-remaining" data-summary-card="remaining" data-summary-vendor="{{ $selectedVendor?->name ?? 'Semua Vendor' }}">
                 <span class="term-summary-icon">
                   <i class="ti ti-receipt-refund"></i>
@@ -401,7 +422,14 @@
                 <div>
                   <span class="term-summary-label">Total Sisa Pembayaran</span>
                   <strong class="term-summary-value">{{ $formatRupiah($paymentTotals['remaining'] ?? 0) }}</strong>
-                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - belum lunas</span>
+                  <span class="term-summary-helper">
+                    {{ $selectedVendor?->name ?? 'Semua Vendor' }} -
+                    @if (($paymentTotals['remaining'] ?? 0) > 0)
+                      <span class="badge bg-light-warning text-warning">Belum Lunas</span>
+                    @else
+                      <span class="badge bg-light-success text-success">Lunas</span>
+                    @endif
+                  </span>
                 </div>
               </div>
             </div>
