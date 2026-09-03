@@ -336,7 +336,7 @@ class DashboardTest extends TestCase
             ->assertDontSee('id="receipt-preview-zoom-controls"', false)
             ->assertDontSee('id="receipt-preview-zoom-in"', false)
             ->assertDontSee('id="receipt-preview-zoom-out"', false)
-            ->assertSee('data-receipt-date="Rabu, 2026-09-02"', false)
+            ->assertSee('data-receipt-date="02 September 2026"', false)
             ->assertSee('data-receipt-amount="- Rp 2.500.000"', false)
             ->assertSee('data-receipt-notes="Catatan bukti dashboard"', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/bukti-dashboard.jpg"', false)

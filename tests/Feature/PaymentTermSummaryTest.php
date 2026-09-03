@@ -62,6 +62,28 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('Pembayaran 8');
     }
 
+    public function test_payment_recap_shows_paid_and_remaining_summary_cards(): void
+    {
+        [$project, $partialWorkItem] = $this->workItemForActiveProject('Pekerjaan Summary Sisa');
+        $paidOffWorkItem = $this->workItemInProject($project, 'Pekerjaan Summary Lunas');
+
+        $this->paymentGroupFor($partialWorkItem, 2, payments: [1 => 30000000]);
+        $this->paymentGroupFor($paidOffWorkItem, 1, payments: [1 => 80000000]);
+
+        $response = $this->get(route('termin-pembayaran.index'));
+
+        $response
+            ->assertSee('data-summary-card="paid"', false)
+            ->assertSee('data-summary-card="remaining"', false)
+            ->assertSee('Total Sudah Dibayar')
+            ->assertSee('Total Sisa Pembayaran')
+            ->assertSee('Rp 110.000.000')
+            ->assertSee('Rp 50.000.000')
+            ->assertSee('Semua Vendor - 2 pekerjaan')
+            ->assertSee('Semua Vendor - belum lunas')
+            ->assertSee('class="col-12 col-md-3"', false);
+    }
+
     public function test_terms_filter_limits_rows_and_columns_to_selected_automatic_payment_count(): void
     {
         [$project, $oneTermWorkItem] = $this->workItemForActiveProject('Pekerjaan Hanya Termin 1');
@@ -122,6 +144,9 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('Vendor')
             ->assertSee('Pasang Kanopi')
             ->assertSee('Vendor Kanopi')
+            ->assertSee('data-summary-vendor="Vendor Kanopi"', false)
+            ->assertSee('Vendor Kanopi - 1 pekerjaan')
+            ->assertSee('Vendor Kanopi - belum lunas')
             ->assertDontSee('Pasang Lantai');
     }
 

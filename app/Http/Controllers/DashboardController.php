@@ -296,7 +296,7 @@ class DashboardController extends Controller
             return '-';
         }
 
-        return $this->dayName($date).', '.$date->format('Y-m-d');
+        return $date->format('d F Y');
     }
 
     private function dayName(?CarbonInterface $date): string

@@ -26,6 +26,68 @@
       grid-template-columns: minmax(220px, 1fr) minmax(190px, 0.75fr) minmax(150px, 0.55fr) auto;
     }
 
+    .term-summary-card {
+      align-items: center;
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      display: flex;
+      gap: 12px;
+      min-height: 78px;
+      padding: 12px 14px;
+    }
+
+    .term-summary-card.is-paid {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+
+    .term-summary-card.is-remaining {
+      background: #fff7ed;
+      border-color: #fed7aa;
+    }
+
+    .term-summary-icon {
+      align-items: center;
+      border-radius: 8px;
+      color: #fff;
+      display: inline-flex;
+      flex: 0 0 36px;
+      font-size: 18px;
+      height: 36px;
+      justify-content: center;
+      width: 36px;
+    }
+
+    .term-summary-card.is-paid .term-summary-icon {
+      background: #00c853;
+    }
+
+    .term-summary-card.is-remaining .term-summary-icon {
+      background: #f59e0b;
+    }
+
+    .term-summary-label {
+      color: #697586;
+      display: block;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .term-summary-value {
+      color: #202939;
+      display: block;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .term-summary-helper {
+      color: #697586;
+      display: block;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+
     .term-table th {
       background: #f8fafc;
       border-bottom: 0;
@@ -318,6 +380,33 @@
             </button>
           </form>
 
+          <div class="row g-3 mb-4">
+            <div class="col-12 col-md-3">
+              <div class="term-summary-card is-paid" data-summary-card="paid" data-summary-vendor="{{ $selectedVendor?->name ?? 'Semua Vendor' }}">
+                <span class="term-summary-icon">
+                  <i class="ti ti-cash-banknote"></i>
+                </span>
+                <div>
+                  <span class="term-summary-label">Total Sudah Dibayar</span>
+                  <strong class="term-summary-value">{{ $formatRupiah($paymentTotals['paid'] ?? 0) }}</strong>
+                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - {{ $paymentTotals['row_count'] ?? 0 }} pekerjaan</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="term-summary-card is-remaining" data-summary-card="remaining" data-summary-vendor="{{ $selectedVendor?->name ?? 'Semua Vendor' }}">
+                <span class="term-summary-icon">
+                  <i class="ti ti-receipt-refund"></i>
+                </span>
+                <div>
+                  <span class="term-summary-label">Total Sisa Pembayaran</span>
+                  <strong class="term-summary-value">{{ $formatRupiah($paymentTotals['remaining'] ?? 0) }}</strong>
+                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - belum lunas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="table table-hover term-table mb-0">
               <thead>
@@ -363,7 +452,7 @@
                             >
                               <i class="ti ti-eye"></i>
                             </button>
-                            <button
+                            {{-- <button
                               type="button"
                               class="term-payment-delete-button"
                               data-bs-toggle="modal"
@@ -375,7 +464,7 @@
                               title="Hapus pembayaran"
                             >
                               <i class="ti ti-trash"></i>
-                            </button>
+                            </button> --}}
                           </div>
                         @else
                           -
