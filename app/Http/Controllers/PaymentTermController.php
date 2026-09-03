@@ -37,7 +37,12 @@ class PaymentTermController extends Controller
             ->get();
 
         $workItems = WorkItem::query()
-            ->with(['paymentGroups.terms.allocations.transaction.attachments', 'vendor'])
+            ->with([
+                'paymentGroups.terms.allocations.transaction.attachments',
+                'paymentGroups.terms.allocations.transaction.serviceDetailWorkItem',
+                'paymentGroups.terms.allocations.transaction.workItem',
+                'vendor',
+            ])
             ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
             ->when(filled($filters['vendor_id'] ?? null), fn ($query) => $query->where('vendor_id', $filters['vendor_id']))
             ->when(filled($filters['search'] ?? null), function ($query) use ($filters) {
@@ -50,6 +55,11 @@ class PaymentTermController extends Controller
                         ->orWhereHas('vendor', fn ($query) => $query->where('name', 'like', "%{$search}%"));
                 });
             })
+            ->orderBy('name')
+            ->get();
+        $serviceDetailOptions = WorkItem::query()
+            ->with('vendor')
+            ->when($activeProject, fn ($query) => $query->whereBelongsTo($activeProject))
             ->orderBy('name')
             ->get();
 
@@ -70,6 +80,7 @@ class PaymentTermController extends Controller
             'paid' => (int) $rows->sum(fn (array $row): int => (int) $row['summary']['paid']),
             'remaining' => (int) $rows->sum(fn (array $row): int => max(0, (int) $row['summary']['remaining'])),
             'row_count' => $rows->count(),
+            'payment_count' => (int) $rows->sum(fn (array $row): int => $row['payments']->count()),
         ];
 
         $maxTermsColumn = filled($filters['terms'] ?? null)
@@ -85,7 +96,43 @@ class PaymentTermController extends Controller
             'availableTermsOptions' => $availableTermsOptions,
             'maxTermsColumn' => $maxTermsColumn,
             'paymentTotals' => $paymentTotals,
+            'serviceDetailOptions' => $serviceDetailOptions,
         ]);
+    }
+
+    public function updateServiceDetail(Request $request, PaymentTerm $paymentTerm): RedirectResponse
+    {
+        $validated = $request->validate([
+            'service_detail_work_item_id' => ['nullable', 'exists:work_items,id'],
+        ]);
+        $activeProject = $this->activeProject();
+
+        $paymentTerm->load([
+            'paymentGroup',
+            'allocations.transaction',
+        ]);
+
+        abort_if(! $activeProject || $paymentTerm->paymentGroup?->project_id !== $activeProject->id, 404);
+
+        $transaction = $this->transactionForTerm($paymentTerm);
+
+        abort_if(! $transaction, 404);
+
+        $serviceDetailWorkItem = null;
+
+        if (filled($validated['service_detail_work_item_id'] ?? null)) {
+            $serviceDetailWorkItem = WorkItem::query()
+                ->whereBelongsTo($activeProject)
+                ->findOrFail($validated['service_detail_work_item_id']);
+        }
+
+        $transaction->forceFill([
+            'service_detail_work_item_id' => $serviceDetailWorkItem && (int) $serviceDetailWorkItem->id !== (int) $transaction->work_item_id
+                ? $serviceDetailWorkItem->id
+                : null,
+        ])->save();
+
+        return back()->with('status', 'Rincian jasa berhasil diperbarui.');
     }
 
     public function destroy(PaymentTerm $paymentTerm): RedirectResponse
@@ -172,7 +219,7 @@ class PaymentTermController extends Controller
                         ->mapWithKeys(fn (PaymentTerm $term): array => [
                             $term->payment_number => [
                                 'amount' => (int) $term->amount,
-                                'detail' => $this->paymentDetail($term),
+                                'detail' => $this->paymentDetail($term, $workItem, $paymentGroup),
                             ],
                         ])
                     : collect(),
@@ -180,24 +227,40 @@ class PaymentTermController extends Controller
         });
     }
 
-    private function paymentDetail(PaymentTerm $term): array
+    private function paymentDetail(PaymentTerm $term, WorkItem $workItem, PaymentGroup $paymentGroup): array
     {
-        $allocation = $term->allocations
-            ->sortByDesc(fn ($allocation) => $allocation->transaction?->recorded_at?->timestamp ?? 0)
-            ->first();
+        $allocation = $this->allocationForTerm($term);
         $transaction = $allocation?->transaction;
         $attachment = $transaction?->attachments->first();
+        $workItemName = $transaction?->workItem?->name ?? $workItem->name;
 
         return [
             'payment_number' => $term->payment_number,
             'payment_term_id' => $term->id,
             'amount' => (int) $term->amount,
             'recorded_at' => $this->formatRecordedDate($transaction?->recorded_at ?? $term->paid_at),
+            'work_item_id' => $transaction?->work_item_id ?? $paymentGroup->work_item_id,
+            'work_item_name' => $workItemName,
+            'service_detail_id' => $transaction?->service_detail_work_item_id,
+            'service_detail' => $this->serviceDetailLabel($transaction?->serviceDetailWorkItem),
+            'search_keyword' => $this->serviceKeyword($workItemName),
             'notes' => $allocation?->notes ?? $transaction?->notes ?? $term->notes ?? '-',
             'receipt_url' => $attachment ? $this->attachmentUrl($attachment) : '',
             'receipt_mime' => $attachment?->mime_type ?? '',
             'receipt_name' => $attachment?->original_name ?? '',
         ];
+    }
+
+    private function serviceKeyword(string $name): string
+    {
+        $stopWords = ['belanja', 'pasang', 'pekerjaan', 'jasa', 'non', 'parent', 'dan', 'di', 'ke', 'untuk', 'dengan', 'utama'];
+
+        $keyword = collect(preg_split('/\s+/', trim($name)) ?: [])
+            ->filter(fn (string $word): bool => $word !== '' && ! is_numeric($word) && ! in_array(mb_strtolower($word), $stopWords, true))
+            ->sortByDesc(fn (string $word): int => mb_strlen($word))
+            ->first();
+
+        return $keyword ? mb_strtolower($keyword) : '';
     }
 
     private function attachmentUrl(ProjectTransactionAttachment $attachment): string
@@ -207,6 +270,27 @@ class PaymentTermController extends Controller
         }
 
         return Storage::disk($attachment->disk)->url($attachment->path);
+    }
+
+    private function allocationForTerm(PaymentTerm $term): ?ProjectTransactionAllocation
+    {
+        return $term->allocations
+            ->sortByDesc(fn (ProjectTransactionAllocation $allocation): int => $allocation->transaction?->recorded_at?->timestamp ?? 0)
+            ->first();
+    }
+
+    private function transactionForTerm(PaymentTerm $term): ?ProjectTransaction
+    {
+        return $this->allocationForTerm($term)?->transaction;
+    }
+
+    private function serviceDetailLabel(?WorkItem $workItem): string
+    {
+        if (! $workItem) {
+            return '';
+        }
+
+        return trim(preg_replace('/^\s*Belanja\s+/i', '', $workItem->name) ?? $workItem->name);
     }
 
     private function attachmentFilesFor(ProjectTransaction $transaction): Collection
@@ -239,20 +323,7 @@ class PaymentTermController extends Controller
             return '-';
         }
 
-        return $this->dayName($date).', '.$date->format('d F Y');
-    }
-
-    private function dayName(CarbonInterface $date): string
-    {
-        return [
-            'Minggu',
-            'Senin',
-            'Selasa',
-            'Rabu',
-            'Kamis',
-            'Jumat',
-            'Sabtu',
-        ][$date->dayOfWeek];
+        return $date->format('d F Y');
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array

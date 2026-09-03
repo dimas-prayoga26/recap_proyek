@@ -133,7 +133,7 @@
       justify-content: flex-end;
     }
 
-    .term-payment-button {
+    .term-payment-menu-button {
       align-items: center;
       background: #eef6ff;
       border: 1px solid #b6dcff;
@@ -148,29 +148,32 @@
       width: 28px;
     }
 
-    .term-payment-button:hover {
+    .term-payment-menu-button:hover {
       background: #dff0ff;
       color: #2196f3;
       text-decoration: none;
     }
 
-    .term-payment-delete-button {
-      align-items: center;
-      background: #ffe8e8;
-      border: 1px solid #ffc8c8;
-      border-radius: 6px;
-      color: #ff3b30;
-      display: inline-flex;
-      font-weight: 700;
-      height: 28px;
-      justify-content: center;
-      padding: 0;
-      width: 28px;
+    .term-payment-menu .dropdown-menu {
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+      min-width: 180px;
+      padding: 6px;
     }
 
-    .term-payment-delete-button:hover {
-      background: #ffdada;
-      color: #e02b20;
+    .term-payment-menu .dropdown-item {
+      align-items: center;
+      border-radius: 6px;
+      display: inline-flex;
+      gap: 8px;
+      font-weight: 700;
+      padding: 8px 10px;
+    }
+
+    .term-payment-menu .dropdown-item.text-danger:hover {
+      background: #fff4f4;
+      color: #ff3b30;
     }
 
     .payment-delete-visual {
@@ -410,7 +413,7 @@
                 <div>
                   <span class="term-summary-label">Total Sudah Dibayar</span>
                   <strong class="term-summary-value">{{ $formatRupiah($paymentTotals['paid'] ?? 0) }}</strong>
-                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - {{ $paymentTotals['row_count'] ?? 0 }} pekerjaan</span>
+                  <span class="term-summary-helper">{{ $selectedVendor?->name ?? 'Semua Vendor' }} - {{ $paymentTotals['payment_count'] ?? 0 }} pembayaran</span>
                 </div>
               </div>
             </div>
@@ -459,40 +462,79 @@
                     <td class="term-amount-cell">{{ $formatRupiah($row['summary']['offer']) }}</td>
                     @for ($number = 1; $number <= $maxTermsColumn; $number++)
                     <td class="term-amount-cell">
-                        @php($payment = $row['payments']->get($number))
+                        @php
+                          $payment = $row['payments']->get($number);
+                        @endphp
                         @if ($payment)
                           <div class="term-payment-action">
                             <span>{{ $formatRupiah($payment['amount']) }}</span>
-                            <button
-                              type="button"
-                              class="term-payment-button"
-                              data-bs-toggle="modal"
-                              data-bs-target="#payment-detail-modal"
-                              data-payment-number="{{ $payment['detail']['payment_number'] }}"
-                              data-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
-                              data-recorded-at="{{ $payment['detail']['recorded_at'] }}"
-                              data-notes="{{ $payment['detail']['notes'] }}"
-                              data-receipt-url="{{ $payment['detail']['receipt_url'] }}"
-                              data-receipt-mime="{{ $payment['detail']['receipt_mime'] }}"
-                              data-receipt-name="{{ $payment['detail']['receipt_name'] }}"
-                              aria-label="Lihat detail pembayaran ke-{{ $payment['detail']['payment_number'] }}"
-                              title="Lihat detail"
-                            >
-                              <i class="ti ti-eye"></i>
-                            </button>
-                            {{-- <button
-                              type="button"
-                              class="term-payment-delete-button"
-                              data-bs-toggle="modal"
-                              data-bs-target="#payment-delete-modal"
-                              data-delete-action="{{ route('termin-pembayaran.destroy', $payment['detail']['payment_term_id']) }}"
-                              data-delete-payment-number="{{ $payment['detail']['payment_number'] }}"
-                              data-delete-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
-                              aria-label="Hapus pembayaran ke-{{ $payment['detail']['payment_number'] }}"
-                              title="Hapus pembayaran"
-                            >
-                              <i class="ti ti-trash"></i>
-                            </button> --}}
+                            <div class="dropdown term-payment-menu">
+                              <button
+                                type="button"
+                                class="term-payment-menu-button"
+                                data-bs-toggle="dropdown"
+                                data-bs-boundary="viewport"
+                                aria-expanded="false"
+                                aria-label="Aksi pembayaran ke-{{ $payment['detail']['payment_number'] }}"
+                                title="Aksi pembayaran"
+                              >
+                                <i class="ti ti-dots-vertical"></i>
+                              </button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item term-payment-detail-action"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#payment-detail-modal"
+                                    data-payment-number="{{ $payment['detail']['payment_number'] }}"
+                                    data-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                                    data-recorded-at="{{ $payment['detail']['recorded_at'] }}"
+                                    data-service-detail="{{ $payment['detail']['service_detail'] }}"
+                                    data-notes="{{ $payment['detail']['notes'] }}"
+                                    data-receipt-url="{{ $payment['detail']['receipt_url'] }}"
+                                    data-receipt-mime="{{ $payment['detail']['receipt_mime'] }}"
+                                    data-receipt-name="{{ $payment['detail']['receipt_name'] }}"
+                                  >
+                                    <i class="ti ti-eye"></i>
+                                    <span>Detail</span>
+                                  </button>
+                                </li>
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item term-payment-update-action"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#payment-update-detail-modal"
+                                    data-update-action="{{ route('termin-pembayaran.rincian.update', $payment['detail']['payment_term_id']) }}"
+                                    data-update-payment-number="{{ $payment['detail']['payment_number'] }}"
+                                    data-update-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                                    data-update-work-item-id="{{ $payment['detail']['work_item_id'] }}"
+                                    data-update-work-item-name="{{ $payment['detail']['work_item_name'] }}"
+                                    data-current-service-detail-id="{{ $payment['detail']['service_detail_id'] }}"
+                                    data-update-search-keyword="{{ $payment['detail']['search_keyword'] }}"
+                                  >
+                                    <i class="ti ti-edit"></i>
+                                    <span>Update Rincian</span>
+                                  </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                  <button
+                                    type="button"
+                                    class="dropdown-item text-danger term-payment-delete-action"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#payment-delete-modal"
+                                    data-delete-action="{{ route('termin-pembayaran.destroy', $payment['detail']['payment_term_id']) }}"
+                                    data-delete-payment-number="{{ $payment['detail']['payment_number'] }}"
+                                    data-delete-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                                  >
+                                    <i class="ti ti-trash"></i>
+                                    <span>Delete</span>
+                                  </button>
+                                </li>
+                              </ul>
+                            </div>
                           </div>
                         @else
                           -
@@ -533,6 +575,10 @@
             <span>Tanggal Pencatatan</span>
             <strong id="payment-detail-date">-</strong>
           </div>
+          <div class="payment-detail-line d-none" id="payment-detail-service-row">
+            <span>Rincian Jasa</span>
+            <strong id="payment-detail-service">-</strong>
+          </div>
           <div class="py-3">
             <span class="d-block text-muted fs-6 mb-2">Bukti Pembayaran</span>
             <div class="payment-detail-preview">
@@ -553,6 +599,71 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="payment-update-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form method="POST" action="#" class="modal-content" id="payment-update-detail-form">
+        @csrf
+        @method('PATCH')
+        <div class="modal-header">
+          <h5 class="modal-title">Update Rincian Jasa</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="payment-detail-line pt-0">
+            <span>Pembayaran</span>
+            <strong id="payment-update-detail-summary">-</strong>
+          </div>
+          <div class="payment-detail-line">
+            <span>Pekerjaan Utama</span>
+            <strong id="payment-update-work-item">-</strong>
+          </div>
+          <div class="mt-3">
+            <label for="payment-update-detail-toggle" class="form-label">Rincian Jasa</label>
+            <input type="hidden" id="payment-update-detail-value" name="service_detail_work_item_id" value="" />
+            <div class="dropdown vendor-search-dropdown">
+              <button class="form-select text-start" type="button" id="payment-update-detail-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <span id="payment-update-detail-label">Tanpa rincian</span>
+              </button>
+              <div class="dropdown-menu w-100 p-2" aria-labelledby="payment-update-detail-toggle">
+                <input type="search" class="form-control form-control-sm mb-2" id="payment-update-detail-search" placeholder="Cari rincian pekerjaan..." autocomplete="off" />
+                <div class="vendor-search-options" id="payment-update-detail-options">
+                  <button type="button" class="dropdown-item rincian-detail-option active" data-value="" data-label="Tanpa rincian" data-search="tanpa rincian">
+                    Tanpa rincian
+                  </button>
+                  @foreach (($serviceDetailOptions ?? collect()) as $item)
+                    @php
+                      $serviceDetailLabel = trim(preg_replace('/^\s*Belanja\s+/i', '', $item->name) ?? $item->name);
+                      $serviceDetailVendorName = $item->vendor?->name;
+                      $serviceDetailOptionLabel = $serviceDetailVendorName ? $serviceDetailLabel.' - '.$serviceDetailVendorName : $serviceDetailLabel;
+                      $serviceDetailSearch = strtolower(trim($serviceDetailLabel.' '.$item->name.' '.$serviceDetailVendorName));
+                    @endphp
+                    <button
+                      type="button"
+                      class="dropdown-item rincian-detail-option"
+                      data-value="{{ $item->id }}"
+                      data-label="{{ $serviceDetailOptionLabel }}"
+                      data-search="{{ $serviceDetailSearch }}"
+                    >
+                      {{ $serviceDetailOptionLabel }}
+                    </button>
+                  @endforeach
+                  <div class="searchable-select-empty d-none" id="payment-update-detail-empty">Rincian tidak ditemukan.</div>
+                </div>
+              </div>
+            </div>
+            <small class="form-text text-muted">Pembayaran tetap masuk ke pekerjaan utama. Rincian ini hanya buat keterangan jasa di rekap.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="ti ti-device-floppy me-1"></i> Simpan Rincian
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -635,6 +746,8 @@
       const paymentDetailTitle = document.querySelector('#payment-detail-title');
       const paymentDetailAmount = document.querySelector('#payment-detail-amount');
       const paymentDetailDate = document.querySelector('#payment-detail-date');
+      const paymentDetailServiceRow = document.querySelector('#payment-detail-service-row');
+      const paymentDetailService = document.querySelector('#payment-detail-service');
       const paymentDetailNotes = document.querySelector('#payment-detail-notes');
       const paymentDetailEmpty = document.querySelector('#payment-detail-empty');
       const paymentDetailPreview = document.querySelector('.payment-detail-preview');
@@ -642,6 +755,15 @@
       const paymentDetailPdf = document.querySelector('#payment-detail-pdf');
       const paymentDetailDownload = document.querySelector('#payment-detail-download');
       const paymentDetailDownloadText = paymentDetailDownload.querySelector('span');
+      const paymentUpdateDetailForm = document.querySelector('#payment-update-detail-form');
+      const paymentUpdateDetailSummary = document.querySelector('#payment-update-detail-summary');
+      const paymentUpdateWorkItem = document.querySelector('#payment-update-work-item');
+      const paymentUpdateDetailSearch = document.querySelector('#payment-update-detail-search');
+      const paymentUpdateDetailToggle = document.querySelector('#payment-update-detail-toggle');
+      const paymentUpdateDetailLabel = document.querySelector('#payment-update-detail-label');
+      const paymentUpdateDetailValue = document.querySelector('#payment-update-detail-value');
+      const paymentUpdateDetailEmpty = document.querySelector('#payment-update-detail-empty');
+      const paymentUpdateDetailOptions = Array.from(document.querySelectorAll('.rincian-detail-option'));
       const paymentDeleteForm = document.querySelector('#payment-delete-form');
       const paymentDeleteSummary = document.querySelector('#payment-delete-summary');
       let paymentDetailZoom = 1;
@@ -719,7 +841,55 @@
         showPaymentReceiptFallback('Preview gambar gagal dimuat. Buka file bukti pembayaran.', paymentDetailImage.dataset.receiptName || '');
       });
 
-      document.querySelectorAll('.term-payment-button').forEach(function (button) {
+      function selectRincianOption(option) {
+        if (!option) {
+          return;
+        }
+
+        paymentUpdateDetailValue.value = option.dataset.value || '';
+        paymentUpdateDetailLabel.textContent = option.dataset.label || 'Tanpa rincian';
+
+        paymentUpdateDetailOptions.forEach(function (item) {
+          item.classList.toggle('active', item === option);
+        });
+      }
+
+      function filterPaymentUpdateOptions() {
+        const keyword = paymentUpdateDetailSearch.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        paymentUpdateDetailOptions.forEach(function (option) {
+          const isBlocked = option.dataset.blocked === '1';
+          const matches = option.dataset.value === ''
+            || (option.dataset.search || option.textContent).toLowerCase().includes(keyword);
+          const isVisible = !isBlocked && matches;
+
+          option.classList.toggle('d-none', !isVisible);
+
+          if (isVisible) {
+            visibleCount++;
+          }
+        });
+
+        paymentUpdateDetailEmpty.classList.toggle('d-none', visibleCount > 0);
+      }
+
+      paymentUpdateDetailOptions.forEach(function (option) {
+        option.addEventListener('click', function () {
+          if (option.dataset.blocked === '1') {
+            return;
+          }
+
+          selectRincianOption(option);
+          bootstrap.Dropdown.getOrCreateInstance(paymentUpdateDetailToggle).hide();
+        });
+      });
+
+      paymentUpdateDetailToggle.addEventListener('shown.bs.dropdown', function () {
+        paymentUpdateDetailSearch.focus();
+      });
+
+      document.querySelectorAll('.term-payment-detail-action').forEach(function (button) {
         button.addEventListener('click', function () {
           const receiptUrl = button.dataset.receiptUrl || '';
           const receiptMime = (button.dataset.receiptMime || '').toLowerCase();
@@ -731,6 +901,8 @@
           paymentDetailTitle.textContent = 'Pembayaran ke-' + (button.dataset.paymentNumber || '-');
           paymentDetailAmount.textContent = button.dataset.amount || '-';
           paymentDetailDate.textContent = button.dataset.recordedAt || '-';
+          paymentDetailService.textContent = button.dataset.serviceDetail || '-';
+          paymentDetailServiceRow.classList.toggle('d-none', !button.dataset.serviceDetail);
           paymentDetailNotes.textContent = button.dataset.notes || '-';
           resetPaymentReceiptPreview();
 
@@ -761,7 +933,33 @@
         });
       });
 
-      document.querySelectorAll('.term-payment-delete-button').forEach(function (button) {
+      document.querySelectorAll('.term-payment-update-action').forEach(function (button) {
+        button.addEventListener('click', function () {
+          const blockedWorkItemId = button.dataset.updateWorkItemId || '';
+          const currentServiceDetailId = button.dataset.currentServiceDetailId || '';
+
+          paymentUpdateDetailForm.action = button.dataset.updateAction || '#';
+          paymentUpdateDetailSummary.textContent = 'Pembayaran ke-' + (button.dataset.updatePaymentNumber || '-') + ' - ' + (button.dataset.updateAmount || '-');
+          paymentUpdateWorkItem.textContent = button.dataset.updateWorkItemName || '-';
+          paymentUpdateDetailSearch.value = button.dataset.updateSearchKeyword || '';
+
+          paymentUpdateDetailOptions.forEach(function (option) {
+            option.dataset.blocked = option.dataset.value && option.dataset.value === blockedWorkItemId ? '1' : '0';
+          });
+
+          const currentOption = paymentUpdateDetailOptions.find(function (option) {
+            return option.dataset.value === currentServiceDetailId;
+          });
+
+          selectRincianOption(currentOption?.dataset.blocked === '1' ? paymentUpdateDetailOptions[0] : (currentOption || paymentUpdateDetailOptions[0]));
+
+          filterPaymentUpdateOptions();
+        });
+      });
+
+      paymentUpdateDetailSearch.addEventListener('input', filterPaymentUpdateOptions);
+
+      document.querySelectorAll('.term-payment-delete-action').forEach(function (button) {
         button.addEventListener('click', function () {
           paymentDeleteForm.action = button.dataset.deleteAction || '#';
           paymentDeleteSummary.textContent = 'Hapus pembayaran ke-' + (button.dataset.deletePaymentNumber || '-') + ' sebesar ' + (button.dataset.deleteAmount || '-') + '?';

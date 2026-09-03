@@ -43,6 +43,7 @@ class TransactionController extends Controller
             'project_id' => ['required', 'exists:projects,id'],
             'transaction_category_id' => ['nullable', 'exists:transaction_categories,id'],
             'work_item_id' => ['required', 'exists:work_items,id'],
+            'service_detail_work_item_id' => ['nullable', 'exists:work_items,id'],
             'vendor_id' => ['nullable', 'exists:vendors,id'],
             'amount' => ['required', 'integer', 'min:1'],
             'amount_display' => ['nullable', 'string', 'max:255'],
@@ -68,6 +69,7 @@ class TransactionController extends Controller
 
         $project = Project::query()->findOrFail($validated['project_id']);
         $workItem = WorkItem::query()->findOrFail($validated['work_item_id']);
+        $serviceDetailWorkItem = $this->serviceDetailWorkItemFromTransaction($validated, $project, $workItem);
 
         if ((int) $workItem->project_id !== (int) $project->id) {
             throw ValidationException::withMessages([
@@ -84,7 +86,7 @@ class TransactionController extends Controller
                 ->withInput();
         }
 
-        $transaction = DB::transaction(function () use ($request, $validated, $project, $workItem, $additionalAllocations, $additionalTotal) {
+        $transaction = DB::transaction(function () use ($request, $validated, $project, $workItem, $serviceDetailWorkItem, $additionalAllocations, $additionalTotal) {
             $transactionCategoryId = $this->resolveTransactionCategoryId($validated);
             $paymentGroup = $this->paymentGroupFromTransaction($validated, $project, $workItem);
             $primaryAmount = $validated['type'] === 'keluar'
@@ -95,6 +97,7 @@ class TransactionController extends Controller
                 'project_id' => $project->id,
                 'transaction_category_id' => $transactionCategoryId,
                 'work_item_id' => $workItem->id,
+                'service_detail_work_item_id' => $serviceDetailWorkItem?->id,
                 'vendor_id' => $validated['vendor_id'] ?? null,
                 'payment_group_id' => $paymentGroup?->id,
                 'type' => $validated['type'],
@@ -198,6 +201,27 @@ class TransactionController extends Controller
         $prefix = $amount < 0 ? '- ' : '';
 
         return $prefix.'Rp '.number_format(abs($amount), 0, ',', '.');
+    }
+
+    private function serviceDetailWorkItemFromTransaction(array $validated, Project $project, WorkItem $workItem): ?WorkItem
+    {
+        if (($validated['type'] ?? null) !== 'keluar' || blank($validated['service_detail_work_item_id'] ?? null)) {
+            return null;
+        }
+
+        $serviceDetailWorkItem = WorkItem::query()->findOrFail($validated['service_detail_work_item_id']);
+
+        if ((int) $serviceDetailWorkItem->project_id !== (int) $project->id) {
+            throw ValidationException::withMessages([
+                'service_detail_work_item_id' => 'Rincian pekerjaan harus dari project yang sama.',
+            ]);
+        }
+
+        if ((int) $serviceDetailWorkItem->id === (int) $workItem->id) {
+            return null;
+        }
+
+        return $serviceDetailWorkItem;
     }
 
     private function additionalAllocations(array $validated, Project $project): Collection

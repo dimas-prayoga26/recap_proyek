@@ -65,6 +65,167 @@ class TransactionAllocationTest extends TestCase
             });
     }
 
+    public function test_expense_form_uses_service_vendor_keyword_to_show_related_work_items(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Vendor Jasa Marmer Test',
+            'slug' => 'project-vendor-jasa-marmer-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+        $serviceVendor = Vendor::firstOrCreate(['name' => 'Jasa Pasang Marmer']);
+        $materialVendor = Vendor::firstOrCreate(['name' => 'ADP Marmer']);
+        $serviceWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $serviceVendor->id,
+            'name' => 'Pasang Marmer',
+            'offer_rupiah' => 1000000000,
+        ]);
+        WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $materialVendor->id,
+            'name' => 'Belanja Marmer Family Room lantai 2',
+            'offer_rupiah' => 321600000,
+        ]);
+        WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $materialVendor->id,
+            'name' => 'Belanja Keramik Kamar Mandi',
+            'offer_rupiah' => 89593680,
+        ]);
+
+        $response = $this->get(route('uang-keluar.index', ['work_item_id' => $serviceWorkItem->id]));
+
+        $response
+            ->assertSee('id="related-work-item-row"', false)
+            ->assertSee('id="related-work-item-trigger"', false)
+            ->assertSee('name="service_detail_work_item_id"', false)
+            ->assertSee('data-filter-attr="relatedTrigger"', false)
+            ->assertSee('Vendor jasa ini punya rincian')
+            ->assertSee('Pilih rincian yang dikerjakan supaya bukti pembayaran jelas untuk bagian mana.')
+            ->assertSee('serviceKeywordsFromText', false)
+            ->assertSee('updateRelatedWorkItems', false)
+            ->assertSee('data-related-search="Belanja Marmer Family Room lantai 2', false)
+            ->assertSee('data-display-label="Marmer Family Room lantai 2"', false)
+            ->assertSee('data-search="Marmer Family Room lantai 2 Belanja Marmer Family Room lantai 2', false);
+    }
+
+    public function test_expense_transaction_keeps_service_work_item_and_saves_service_detail(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Service Detail Payment Test',
+            'slug' => 'project-service-detail-payment-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $serviceVendor = Vendor::firstOrCreate(['name' => 'Jasa Pasang Marmer']);
+        $materialVendor = Vendor::firstOrCreate(['name' => 'ADP Marmer']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $serviceWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $serviceVendor->id,
+            'name' => 'Pasang Marmer',
+            'offer_rupiah' => 1000000000,
+        ]);
+        $serviceDetailWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $materialVendor->id,
+            'name' => 'Belanja Marmer Family Room lantai 2',
+            'offer_rupiah' => 321600000,
+        ]);
+
+        $response = $this->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $serviceWorkItem->id,
+            'service_detail_work_item_id' => $serviceDetailWorkItem->id,
+            'vendor_id' => $serviceVendor->id,
+            'amount' => 80000000,
+            'recorded_at' => '2026-09-03',
+            'payment_number' => 1,
+            'receipt_total' => 1000000000,
+            'notes' => 'Jasa pemasangan family room',
+        ]);
+
+        $response->assertRedirect(route('uang-keluar.index'));
+
+        $transaction = ProjectTransaction::query()->latest('id')->firstOrFail();
+        $paymentGroup = PaymentGroup::query()->where('work_item_id', $serviceWorkItem->id)->firstOrFail();
+
+        $this->assertSame($serviceWorkItem->id, $transaction->work_item_id);
+        $this->assertSame($serviceVendor->id, $transaction->vendor_id);
+        $this->assertSame($serviceDetailWorkItem->id, $transaction->service_detail_work_item_id);
+        $this->assertDatabaseHas('payment_terms', [
+            'payment_group_id' => $paymentGroup->id,
+            'payment_number' => 1,
+            'amount' => 80000000,
+        ]);
+        $this->assertDatabaseMissing('payment_groups', [
+            'work_item_id' => $serviceDetailWorkItem->id,
+        ]);
+    }
+
+    public function test_expense_transaction_rejects_service_detail_from_another_project(): void
+    {
+        $project = Project::create([
+            'name' => 'Project Service Detail Valid Test',
+            'slug' => 'project-service-detail-valid-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $otherProject = Project::create([
+            'name' => 'Project Other Service Detail Test',
+            'slug' => 'project-other-service-detail-test-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $vendor = Vendor::firstOrCreate(['name' => 'Jasa Valid Detail']);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $serviceWorkItem = WorkItem::create([
+            'project_id' => $project->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Pasang Marmer Valid',
+            'offer_rupiah' => 100000000,
+        ]);
+        $otherWorkItem = WorkItem::create([
+            'project_id' => $otherProject->id,
+            'vendor_id' => $vendor->id,
+            'name' => 'Belanja Marmer Project Lain',
+            'offer_rupiah' => 100000000,
+        ]);
+
+        $response = $this->from(route('uang-keluar.index'))->post(route('transactions.store'), [
+            'type' => 'keluar',
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $serviceWorkItem->id,
+            'service_detail_work_item_id' => $otherWorkItem->id,
+            'vendor_id' => $vendor->id,
+            'amount' => 10000000,
+            'recorded_at' => '2026-09-03',
+            'payment_number' => 1,
+            'receipt_total' => 100000000,
+        ]);
+
+        $response
+            ->assertRedirect(route('uang-keluar.index'))
+            ->assertSessionHasErrors([
+                'service_detail_work_item_id' => 'Rincian pekerjaan harus dari project yang sama.',
+            ]);
+
+        $this->assertDatabaseMissing('project_transactions', [
+            'work_item_id' => $serviceWorkItem->id,
+            'service_detail_work_item_id' => $otherWorkItem->id,
+        ]);
+    }
+
     public function test_expense_transaction_accepts_formatted_usd_amount_input(): void
     {
         $project = Project::create([

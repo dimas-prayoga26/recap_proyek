@@ -41,6 +41,7 @@ Route::post('/transaksi', [TransactionController::class, 'store'])->name('transa
 
 Route::redirect('/kelompok-pembayaran', '/termin-pembayaran')->name('kelompok-pembayaran.index');
 Route::get('/termin-pembayaran', [PaymentTermController::class, 'index'])->name('termin-pembayaran.index');
+Route::patch('/termin-pembayaran/{paymentTerm}/rincian', [PaymentTermController::class, 'updateServiceDetail'])->name('termin-pembayaran.rincian.update');
 Route::delete('/termin-pembayaran/{paymentTerm}', [PaymentTermController::class, 'destroy'])->name('termin-pembayaran.destroy');
 
 Route::view('/bukti-transaksi', 'pages.placeholder', [

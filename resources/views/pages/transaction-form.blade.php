@@ -606,6 +606,7 @@
             @csrf
             <input type="hidden" name="type" id="transaction-type" value="{{ $transactionType }}" />
             <input type="hidden" name="kelompok_pembayaran" value="termin" />
+            <input type="hidden" name="service_detail_work_item_id" id="service-detail-work-item-id" value="{{ old('service_detail_work_item_id') }}" />
 
             <div class="mb-4">
               <label class="form-label d-block">Jenis Transaksi</label>
@@ -652,13 +653,17 @@
                     <div class="searchable-select-menu" data-role="menu"></div>
                     <select class="form-select d-none" id="activity-name" name="work_item_id" data-role="source">
                       @forelse (($workItems ?? collect()) as $item)
+                        @php
+                          $displayLabel = preg_replace('/^\s*Belanja\s+/i', '', $item->name);
+                        @endphp
                         <option
                           value="{{ $item->id }}"
                           data-vendor-id="{{ $item->vendor_id }}"
                           data-project-id="{{ $item->project_id }}"
                           data-package-name="{{ $item->package_name }}"
                           data-package-label="{{ trim(($item->package_name ? 'Kategori: '.$item->package_name.' | ' : '').$item->packageItems->pluck('name')->join(', ')) }}"
-                          data-search="{{ $item->name.' '.$item->package_name.' '.$item->brand.' '.$item->packageItems->pluck('name')->join(' ') }}"
+                          data-display-label="{{ $item->package_name ? $item->package_name.' - '.$displayLabel : $displayLabel }}"
+                          data-search="{{ $displayLabel.' '.$item->name.' '.$item->package_name.' '.$item->brand.' '.$item->packageItems->pluck('name')->join(' ') }}"
                           @selected((int) old('work_item_id', $selectedWorkItem?->id) === $item->id)
                         >
                           {{ $item->package_name ? $item->package_name.' - '.$item->name : $item->name }}
@@ -694,6 +699,48 @@
                 </div>
               </div>
             </div>
+
+            @unless ($isIncome)
+              <div class="row d-none" id="related-work-item-row">
+                <div class="col-12">
+                  <div class="mb-3">
+                    <input type="hidden" id="related-work-item-trigger" />
+                    <label for="related-work-item-search" class="form-label">Rincian Pekerjaan</label>
+                    <div class="searchable-select js-searchable-select" data-filter-select="#related-work-item-trigger" data-filter-attr="relatedTrigger">
+                      <input type="text" class="form-control searchable-select-input" id="related-work-item-search" data-role="search-input" placeholder="Pilih rincian pekerjaan..." autocomplete="off" />
+                      <div class="searchable-select-menu" data-role="menu"></div>
+                      <select class="form-select d-none" id="related-work-item-select" data-role="source">
+                        <option value="" data-related-trigger="">Pilih rincian pekerjaan</option>
+                        @foreach (($workItems ?? collect()) as $item)
+                          @php
+                            $detailLabel = preg_replace('/^\s*Belanja\s+/i', '', $item->name);
+                            $relatedSearch = trim($item->name.' '.$item->package_name.' '.$item->brand.' '.$item->vendor?->name.' '.$item->packageItems->pluck('name')->join(' '));
+                          @endphp
+                          <option
+                            value="{{ $item->id }}"
+                            data-related-trigger="__hidden__"
+                            data-project-id="{{ $item->project_id }}"
+                            data-vendor-id="{{ $item->vendor_id }}"
+                            data-related-search="{{ $relatedSearch }}"
+                            data-display-label="{{ $detailLabel }}"
+                            data-search="{{ $detailLabel.' '.$relatedSearch }}"
+                            @selected((int) old('service_detail_work_item_id') === $item->id)
+                          >
+                            {{ $detailLabel }}
+                          </option>
+                        @endforeach
+                      </select>
+                    </div>
+                    <small class="form-helper text-primary" id="related-work-item-helper">
+                      Vendor jasa ini cocok dengan beberapa rincian. Pilih rincian yang dikerjakan supaya bukti pembayaran jelas untuk bagian mana.
+                    </small>
+                    @error('service_detail_work_item_id')
+                      <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                  </div>
+                </div>
+              </div>
+            @endunless
 
             @unless ($isIncome)
               <div class="work-termin-info" id="work-termin-info">
@@ -986,6 +1033,11 @@
       const receiptName = document.querySelector('#receipt-name');
       const receiptSize = document.querySelector('#receipt-size');
       const receiptRemoveButton = document.querySelector('#receipt-remove');
+      const relatedWorkItemRow = document.querySelector('#related-work-item-row');
+      const relatedWorkItemTrigger = document.querySelector('#related-work-item-trigger');
+      const relatedWorkItemInput = document.querySelector('#related-work-item-select');
+      const relatedWorkItemHelper = document.querySelector('#related-work-item-helper');
+      const serviceDetailWorkItemInput = document.querySelector('#service-detail-work-item-id');
       const draftStatus = document.querySelector('#draft-status');
       let receiptPreviewUrl = null;
 
@@ -1006,13 +1058,17 @@
           }
 
           return list.filter(function (option) {
-            return !option.dataset[filterAttr] || option.dataset[filterAttr] === filterSelect.value;
+            return option.dataset[filterAttr] === undefined || option.dataset[filterAttr] === filterSelect.value;
           });
+        }
+
+        function optionLabel(option) {
+          return option ? (option.dataset.displayLabel || option.textContent).trim() : '';
         }
 
         function selectedLabel() {
           const option = select.options[select.selectedIndex];
-          return option && option.value !== '' ? option.textContent.trim() : '';
+          return option && option.value !== '' ? optionLabel(option) : '';
         }
 
         function syncInputFromSelect() {
@@ -1046,7 +1102,7 @@
             item.className = 'searchable-select-item' + (option.value === select.value ? ' is-active' : '');
 
             const label = document.createElement('span');
-            label.textContent = option.textContent.trim();
+            label.textContent = optionLabel(option);
             item.appendChild(label);
 
             if (option.dataset.active === '1') {
@@ -1123,6 +1179,17 @@
       const searchableSelectSyncs = searchableSelects.map(function (entry) {
         return entry.sync;
       });
+      const activitySearchableSelect = searchableSelects.find(function (entry) {
+        return entry.wrapper.contains(activityInput);
+      });
+      const vendorSearchableSelect = searchableSelects.find(function (entry) {
+        return entry.wrapper.contains(vendorInput);
+      });
+      const relatedWorkItemSearchableSelect = relatedWorkItemInput
+        ? searchableSelects.find(function (entry) {
+            return entry.wrapper.contains(relatedWorkItemInput);
+          })
+        : null;
 
       const projectActivateModalEl = document.querySelector('#project-activate-modal');
 
@@ -1264,7 +1331,20 @@
         amountDisplayInput.addEventListener('input', updateAllocationSummary);
       }
 
-      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const monthNames = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
       const rupiahFormatter = new Intl.NumberFormat('id-ID');
       const terminInfo = @json($workItemTerminInfo ?? []);
       const terminTitle = document.querySelector('#termin-info-title');
@@ -1690,13 +1770,15 @@
         fetchUsdRate();
       }
 
-      function selectedDayName() {
+      function selectedFormattedDate() {
         if (!dateInput.value) {
           return '';
         }
 
         const selectedDate = new Date(dateInput.value + 'T00:00:00');
-        return dayNames[selectedDate.getDay()];
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+
+        return day + ' ' + monthNames[selectedDate.getMonth()] + ' ' + selectedDate.getFullYear();
       }
 
       function selectedText(input) {
@@ -1704,7 +1786,132 @@
           return '';
         }
 
-        return input.selectedOptions[0].textContent.trim();
+        const selectedOption = input.selectedOptions[0];
+
+        return (selectedOption.dataset.displayLabel || selectedOption.textContent).trim();
+      }
+
+      function normalizeSearchText(value) {
+        return (value || '')
+          .toString()
+          .toLowerCase()
+          .replace(/marmet/g, 'marmer')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function serviceKeywordsFromText(value) {
+        const normalized = normalizeSearchText(value);
+        const tokens = normalized.split(' ').filter(Boolean);
+        const serviceMarkers = ['jasa', 'pasang', 'pemasangan', 'borongan'];
+        const stopWords = serviceMarkers.concat(['belanja', 'pekerjaan', 'kerja', 'vendor', 'kontraktor', 'cv', 'pt']);
+
+        if (!tokens.some(function (token) {
+          return serviceMarkers.indexOf(token) !== -1;
+        })) {
+          return [];
+        }
+
+        return tokens.filter(function (token, index, list) {
+          return token.length > 2 && stopWords.indexOf(token) === -1 && list.indexOf(token) === index;
+        });
+      }
+
+      function activeServiceKeywords() {
+        const vendorKeywords = serviceKeywordsFromText(selectedText(vendorInput));
+
+        if (vendorKeywords.length > 0) {
+          return vendorKeywords;
+        }
+
+        return serviceKeywordsFromText(selectedText(activityInput));
+      }
+
+      function relatedWorkItemMatches(option, keywords, selectedWorkItemId, projectId) {
+        if (!option || !option.value || option.value === selectedWorkItemId) {
+          return false;
+        }
+
+        if (projectId && option.dataset.projectId !== projectId) {
+          return false;
+        }
+
+        const searchText = normalizeSearchText(option.dataset.relatedSearch || option.textContent);
+
+        return keywords.some(function (keyword) {
+          return searchText.indexOf(keyword) !== -1;
+        });
+      }
+
+      function hideRelatedWorkItems() {
+        if (!relatedWorkItemRow || !relatedWorkItemInput || !relatedWorkItemTrigger) {
+          return;
+        }
+
+        relatedWorkItemTrigger.value = '';
+        relatedWorkItemInput.value = '';
+        serviceDetailWorkItemInput.value = '';
+        relatedWorkItemRow.classList.add('d-none');
+
+        if (relatedWorkItemSearchableSelect) {
+          relatedWorkItemSearchableSelect.sync();
+        }
+      }
+
+      function updateRelatedWorkItems() {
+        if (!relatedWorkItemRow || !relatedWorkItemInput || !relatedWorkItemTrigger) {
+          return;
+        }
+
+        const selectedOption = activityInput.selectedOptions[0];
+        const selectedWorkItemId = selectedOption ? selectedOption.value : '';
+        const projectId = projectHoldingInput.value;
+        const keywords = activeServiceKeywords();
+        const trigger = keywords.length > 0 ? 'vendor:' + keywords.join('|') : '';
+        let matchingOptions = 0;
+
+        Array.from(relatedWorkItemInput.options).forEach(function (option) {
+          if (!option.value) {
+            return;
+          }
+
+          const isMatch = trigger !== '' && relatedWorkItemMatches(option, keywords, selectedWorkItemId, projectId);
+          option.dataset.relatedTrigger = isMatch ? trigger : '__hidden__';
+          matchingOptions += isMatch ? 1 : 0;
+        });
+
+        if (matchingOptions === 0) {
+          hideRelatedWorkItems();
+          return;
+        }
+
+        relatedWorkItemTrigger.value = trigger;
+        relatedWorkItemRow.classList.remove('d-none');
+
+        if (serviceDetailWorkItemInput.value && relatedWorkItemInput.value !== serviceDetailWorkItemInput.value) {
+          relatedWorkItemInput.value = serviceDetailWorkItemInput.value;
+        }
+
+        if (relatedWorkItemInput.value) {
+          const selectedRelatedOption = relatedWorkItemInput.selectedOptions[0];
+
+          if (!relatedWorkItemMatches(selectedRelatedOption, keywords, selectedWorkItemId, projectId)) {
+            relatedWorkItemInput.value = '';
+            serviceDetailWorkItemInput.value = '';
+          }
+        }
+
+        if (relatedWorkItemHelper) {
+          relatedWorkItemHelper.textContent = 'Vendor jasa ini punya rincian '
+            + keywords.join(', ')
+            + '. Pilih rincian yang dikerjakan supaya bukti pembayaran jelas untuk bagian mana.';
+        }
+
+        if (relatedWorkItemSearchableSelect) {
+          relatedWorkItemSearchableSelect.refreshForFilter();
+          relatedWorkItemSearchableSelect.sync();
+        }
       }
 
       function updateSummary() {
@@ -1718,20 +1925,24 @@
         document.querySelector('#summary-name').textContent = selectedText(activityInput) || 'Belum tersedia';
         document.querySelector('#summary-vendor').textContent = selectedText(vendorInput) || '-';
         document.querySelector('#summary-amount').textContent = summaryAmount;
-        document.querySelector('#summary-date').textContent = dateInput.value ? selectedDayName() + ', ' + dateInput.value : '-';
+        document.querySelector('#summary-date').textContent = selectedFormattedDate() || '-';
         document.querySelector('#summary-payment').textContent = paymentLabel;
       }
 
-      function syncVendorFromWorkItem() {
+      function syncVendorFromWorkItem(options) {
         const selectedOption = activityInput.selectedOptions[0];
         const vendorId = selectedOption ? selectedOption.dataset.vendorId : '';
+        const keepVendor = options && options.keepVendor;
 
-        if (vendorId) {
+        if (vendorId && !keepVendor) {
           vendorInput.value = vendorId;
           vendorInput.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (keepVendor && vendorSearchableSelect) {
+          vendorSearchableSelect.sync();
         }
 
         updateTerminInfo();
+        updateRelatedWorkItems();
       }
 
       function sizeLabel(bytes) {
@@ -1888,6 +2099,15 @@
       });
 
       activityInput.addEventListener('change', syncVendorFromWorkItem);
+      vendorInput.addEventListener('change', updateRelatedWorkItems);
+
+      if (relatedWorkItemInput) {
+        relatedWorkItemInput.addEventListener('change', function () {
+          serviceDetailWorkItemInput.value = relatedWorkItemInput.value || '';
+          updateSummary();
+        });
+      }
+
       projectHoldingInput.addEventListener('change', function () {
         searchableSelects.forEach(function (entry) {
           if (entry.wrapper.dataset.filterSelect) {
@@ -1895,6 +2115,7 @@
           }
         });
 
+        updateRelatedWorkItems();
         updateSummary();
       });
       receiptFileInput.addEventListener('change', handleReceiptFile);
@@ -1980,6 +2201,7 @@
           searchableSelectSyncs.forEach(function (sync) {
             sync();
           });
+          updateRelatedWorkItems();
 
           if (allocationRows) {
             allocationRows.innerHTML = '';
@@ -1996,6 +2218,7 @@
       }
 
       updateTerminInfo();
+      updateRelatedWorkItems();
     });
   </script>
 @endpush

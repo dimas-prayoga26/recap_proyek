@@ -12,6 +12,7 @@ class ProjectTransaction extends Model
         'project_id',
         'transaction_category_id',
         'work_item_id',
+        'service_detail_work_item_id',
         'vendor_id',
         'payment_group_id',
         'type',
@@ -47,6 +48,11 @@ class ProjectTransaction extends Model
     public function workItem(): BelongsTo
     {
         return $this->belongsTo(WorkItem::class);
+    }
+
+    public function serviceDetailWorkItem(): BelongsTo
+    {
+        return $this->belongsTo(WorkItem::class, 'service_detail_work_item_id');
     }
 
     public function vendor(): BelongsTo

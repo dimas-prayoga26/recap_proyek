@@ -67,7 +67,7 @@ class PaymentTermSummaryTest extends TestCase
         [$project, $partialWorkItem] = $this->workItemForActiveProject('Pekerjaan Summary Sisa');
         $paidOffWorkItem = $this->workItemInProject($project, 'Pekerjaan Summary Lunas');
 
-        $this->paymentGroupFor($partialWorkItem, 2, payments: [1 => 30000000]);
+        $this->paymentGroupFor($partialWorkItem, 2, payments: [1 => 30000000, 2 => 20000000]);
         $this->paymentGroupFor($paidOffWorkItem, 1, payments: [1 => 80000000]);
 
         $response = $this->get(route('termin-pembayaran.index'));
@@ -80,9 +80,10 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('Total Sudah Dibayar')
             ->assertSee('Total Sisa Pembayaran')
             ->assertSee('Rp 160.000.000')
-            ->assertSee('Rp 110.000.000')
-            ->assertSee('Rp 50.000.000')
+            ->assertSee('Rp 130.000.000')
+            ->assertSee('Rp 30.000.000')
             ->assertSee('Semua Vendor - 2 pekerjaan')
+            ->assertSee('Semua Vendor - 3 pembayaran')
             ->assertSee('bg-light-warning text-warning', false)
             ->assertSee('Belum Lunas')
             ->assertSee('class="col-12 col-md-4"', false);
@@ -121,7 +122,7 @@ class PaymentTermSummaryTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('Pekerjaan Hanya Termin 2')
-            ->assertDontSee('Pekerjaan Hanya Termin 1')
+            ->assertDontSee('<span class="term-work-title">Pekerjaan Hanya Termin 1</span>', false)
             ->assertSee('Pembayaran 2')
             ->assertDontSee('Pembayaran 3');
     }
@@ -170,10 +171,10 @@ class PaymentTermSummaryTest extends TestCase
             ->assertSee('Vendor Kanopi - 1 pekerjaan')
             ->assertSee('bg-light-warning text-warning', false)
             ->assertSee('Belum Lunas')
-            ->assertDontSee('Pasang Lantai');
+            ->assertDontSee('<span class="term-work-title">Pasang Lantai</span>', false);
     }
 
-    public function test_paid_payment_cell_shows_nominal_with_eye_button_and_limited_modal_details(): void
+    public function test_paid_payment_cell_shows_nominal_with_action_menu_and_limited_modal_details(): void
     {
         config(['filesystems.disks.public.url' => 'http://127.0.0.1:8001/storage']);
 
@@ -184,12 +185,14 @@ class PaymentTermSummaryTest extends TestCase
             ['status' => 'active'],
         );
         $workItem->update(['vendor_id' => $vendor->id]);
+        $serviceDetailWorkItem = $this->workItemInProject($project, 'Belanja Marmer Family Room lantai 2');
         $paymentGroup = $this->paymentGroupFor($workItem, 1, payments: [1 => 2500000]);
         $paymentTerm = $paymentGroup->terms()->firstOrFail();
         $transaction = ProjectTransaction::create([
             'project_id' => $project->id,
             'transaction_category_id' => $category->id,
             'work_item_id' => $workItem->id,
+            'service_detail_work_item_id' => $serviceDetailWorkItem->id,
             'vendor_id' => $vendor->id,
             'payment_group_id' => $paymentGroup->id,
             'type' => 'keluar',
@@ -224,9 +227,20 @@ class PaymentTermSummaryTest extends TestCase
             ->assertOk()
             ->assertSee('term-payment-action', false)
             ->assertSee('<span>Rp 2.500.000</span>', false)
-            ->assertSee('term-payment-button', false)
+            ->assertSee('term-payment-menu-button', false)
+            ->assertSee('<i class="ti ti-dots-vertical"></i>', false)
+            ->assertSee('term-payment-detail-action', false)
             ->assertSee('<i class="ti ti-eye"></i>', false)
-            ->assertSee('term-payment-delete-button', false)
+            ->assertSee('term-payment-update-action', false)
+            ->assertSee('Update Rincian')
+            ->assertSee('data-update-action="'.route('termin-pembayaran.rincian.update', $paymentTerm).'"', false)
+            ->assertSee('data-update-work-item-id="'.$workItem->id.'"', false)
+            ->assertSee('data-current-service-detail-id="'.$serviceDetailWorkItem->id.'"', false)
+            ->assertSee('id="payment-update-detail-modal"', false)
+            ->assertSee('id="payment-update-detail-form"', false)
+            ->assertSee('name="_method" value="PATCH"', false)
+            ->assertSee('Simpan Rincian')
+            ->assertSee('term-payment-delete-action', false)
             ->assertSee('<i class="ti ti-trash"></i>', false)
             ->assertSee('data-bs-target="#payment-delete-modal"', false)
             ->assertSee('data-delete-action="'.route('termin-pembayaran.destroy', $paymentTerm).'"', false)
@@ -254,7 +268,13 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-zoom-in"', false)
             ->assertDontSee('id="payment-detail-zoom-out"', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
-            ->assertSee('data-recorded-at="Sabtu, 29 August 2026"', false)
+            ->assertSee('data-recorded-at="29 August 2026"', false)
+            ->assertSee('data-service-detail="Marmer Family Room lantai 2"', false)
+            ->assertSee('id="payment-detail-service-row"', false)
+            ->assertSee('id="payment-detail-service"', false)
+            ->assertSee('Rincian Jasa')
+            ->assertSee('button.dataset.serviceDetail', false)
+            ->assertSee('filterPaymentUpdateOptions', false)
             ->assertSee('data-notes="Allocation note"', false)
             ->assertSee('data-receipt-mime=""', false)
             ->assertSee('data-receipt-url="/storage/transaction-receipts/kwitansi-test.pdf"', false)
@@ -267,6 +287,102 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-work"', false)
             ->assertDontSee('id="payment-detail-vendor"', false)
             ->assertDontSee('id="payment-detail-type"', false);
+    }
+
+    public function test_payment_term_service_detail_can_be_updated(): void
+    {
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Update Rincian Jasa');
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $paymentGroup = $this->paymentGroupFor($workItem, 1, payments: [1 => 2500000]);
+        $paymentTerm = $paymentGroup->terms()->firstOrFail();
+        $serviceDetailWorkItem = $this->workItemInProject($project, 'Belanja Marmer Kamar Mandi Utama');
+        $transaction = ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 2500000,
+            'recorded_at' => '2026-09-03',
+            'payment_number' => 1,
+            'payment_total' => 1,
+            'receipt_total' => 80000000,
+        ]);
+        ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'payment_term_id' => $paymentTerm->id,
+            'amount' => 2500000,
+            'payment_number' => 1,
+            'role' => 'primary',
+        ]);
+
+        $response = $this->from(route('termin-pembayaran.index'))->patch(route('termin-pembayaran.rincian.update', $paymentTerm), [
+            'service_detail_work_item_id' => $serviceDetailWorkItem->id,
+        ]);
+
+        $response
+            ->assertRedirect(route('termin-pembayaran.index'))
+            ->assertSessionHas('status', 'Rincian jasa berhasil diperbarui.');
+
+        $this->assertDatabaseHas('project_transactions', [
+            'id' => $transaction->id,
+            'work_item_id' => $workItem->id,
+            'service_detail_work_item_id' => $serviceDetailWorkItem->id,
+        ]);
+    }
+
+    public function test_payment_term_service_detail_update_rejects_other_project_work_item(): void
+    {
+        [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Rincian Project Aktif');
+        $otherProject = Project::create([
+            'name' => 'Project Rincian Lain '.uniqid(),
+            'slug' => 'project-rincian-lain-'.uniqid(),
+            'status' => 'active',
+        ]);
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Jasa Tukang', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $paymentGroup = $this->paymentGroupFor($workItem, 1, payments: [1 => 2500000]);
+        $paymentTerm = $paymentGroup->terms()->firstOrFail();
+        $otherWorkItem = $this->workItemInProject($otherProject, 'Belanja Marmer Project Lain');
+        $transaction = ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'type' => 'keluar',
+            'amount' => 2500000,
+            'recorded_at' => '2026-09-03',
+            'payment_number' => 1,
+            'payment_total' => 1,
+            'receipt_total' => 80000000,
+        ]);
+        ProjectTransactionAllocation::create([
+            'project_transaction_id' => $transaction->id,
+            'work_item_id' => $workItem->id,
+            'payment_group_id' => $paymentGroup->id,
+            'payment_term_id' => $paymentTerm->id,
+            'amount' => 2500000,
+            'payment_number' => 1,
+            'role' => 'primary',
+        ]);
+
+        $response = $this->from(route('termin-pembayaran.index'))->patch(route('termin-pembayaran.rincian.update', $paymentTerm), [
+            'service_detail_work_item_id' => $otherWorkItem->id,
+        ]);
+
+        $response->assertNotFound();
+
+        $this->assertDatabaseHas('project_transactions', [
+            'id' => $transaction->id,
+            'service_detail_work_item_id' => null,
+        ]);
     }
 
     public function test_payment_term_destroy_removes_last_transaction_and_recalculates_remaining(): void
