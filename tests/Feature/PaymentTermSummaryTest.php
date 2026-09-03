@@ -174,12 +174,43 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('<span class="term-work-title">Pasang Lantai</span>', false);
     }
 
+    public function test_payment_recap_table_shows_ten_rows_per_page(): void
+    {
+        [$project] = $this->workItemForActiveProject('Pekerjaan Paginate 00');
+
+        for ($index = 1; $index <= 12; $index++) {
+            $workItem = $this->workItemInProject($project, 'Pekerjaan Paginate '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
+
+            $this->paymentGroupFor($workItem, 1);
+        }
+
+        $firstPage = $this->get(route('termin-pembayaran.index'));
+
+        $firstPage
+            ->assertSee('term-table-full', false)
+            ->assertSee('Menampilkan 1-10 dari 13 pekerjaan')
+            ->assertSee('<span class="term-work-title">Pekerjaan Paginate 00</span>', false)
+            ->assertSee('<span class="term-work-title">Pekerjaan Paginate 09</span>', false)
+            ->assertDontSee('<span class="term-work-title">Pekerjaan Paginate 10</span>', false)
+            ->assertSee('page=2', false);
+        $this->assertSame(10, substr_count($firstPage->getContent(), 'class="term-work-title"'));
+
+        $secondPage = $this->get(route('termin-pembayaran.index', ['page' => 2]));
+
+        $secondPage
+            ->assertSee('Menampilkan 11-13 dari 13 pekerjaan')
+            ->assertSee('<span class="term-work-title">Pekerjaan Paginate 10</span>', false)
+            ->assertSee('<span class="term-work-title">Pekerjaan Paginate 12</span>', false)
+            ->assertDontSee('<span class="term-work-title">Pekerjaan Paginate 09</span>', false);
+        $this->assertSame(3, substr_count($secondPage->getContent(), 'class="term-work-title"'));
+    }
+
     public function test_paid_payment_cell_shows_nominal_with_action_menu_and_limited_modal_details(): void
     {
         config(['filesystems.disks.public.url' => 'http://127.0.0.1:8001/storage']);
 
         [$project, $workItem] = $this->workItemForActiveProject('Pekerjaan Dengan Bukti');
-        $vendor = Vendor::create(['name' => 'Vendor Bukti']);
+        $vendor = Vendor::create(['name' => 'Jasa Pasang Bukti']);
         $category = TransactionCategory::firstOrCreate(
             ['name' => 'Jasa Tukang', 'type' => 'keluar'],
             ['status' => 'active'],
@@ -287,6 +318,37 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-work"', false)
             ->assertDontSee('id="payment-detail-vendor"', false)
             ->assertDontSee('id="payment-detail-type"', false);
+    }
+
+    public function test_payment_update_detail_action_only_shows_for_jasa_pasang_vendor(): void
+    {
+        [, $regularWorkItem] = $this->workItemForActiveProject('Pekerjaan Vendor Biasa');
+        $regularVendor = Vendor::create(['name' => 'Vendor Biasa Test '.uniqid()]);
+        $regularWorkItem->update(['vendor_id' => $regularVendor->id]);
+        $regularPaymentGroup = $this->paymentGroupFor($regularWorkItem, 1, payments: [1 => 1000000]);
+        $regularPaymentTerm = $regularPaymentGroup->terms()->firstOrFail();
+
+        $response = $this->get(route('termin-pembayaran.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('<span class="term-work-title">Pekerjaan Vendor Biasa</span>', false)
+            ->assertDontSee('data-update-action="'.route('termin-pembayaran.rincian.update', $regularPaymentTerm).'"', false)
+            ->assertSee('term-payment-detail-action', false)
+            ->assertSee('term-payment-delete-action', false);
+
+        [, $jasaPasangWorkItem] = $this->workItemForActiveProject('Pekerjaan Vendor Jasa Pasang');
+        $jasaPasangVendor = Vendor::create(['name' => 'Jasa Pasang Detail Test '.uniqid()]);
+        $jasaPasangWorkItem->update(['vendor_id' => $jasaPasangVendor->id]);
+        $jasaPasangPaymentGroup = $this->paymentGroupFor($jasaPasangWorkItem, 1, payments: [1 => 2000000]);
+        $jasaPasangPaymentTerm = $jasaPasangPaymentGroup->terms()->firstOrFail();
+
+        $response = $this->get(route('termin-pembayaran.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('<span class="term-work-title">Pekerjaan Vendor Jasa Pasang</span>', false)
+            ->assertSee('data-update-action="'.route('termin-pembayaran.rincian.update', $jasaPasangPaymentTerm).'"', false);
     }
 
     public function test_payment_term_service_detail_can_be_updated(): void

@@ -19,6 +19,19 @@
 
 @push('styles')
   <style>
+    .term-card-body {
+      --term-card-x: 25px;
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+    }
+
+    .term-payment-card {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 250px);
+    }
+
     .term-filter-grid {
       align-items: end;
       display: grid;
@@ -104,13 +117,41 @@
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0;
+      padding-left: 18px;
+      padding-right: 18px;
       text-transform: uppercase;
       white-space: nowrap;
     }
 
     .term-table td {
+      padding-left: 18px;
+      padding-right: 18px;
       vertical-align: middle;
       white-space: nowrap;
+    }
+
+    .term-table th:first-child,
+    .term-table td:first-child {
+      padding-left: 25px;
+    }
+
+    .term-table th:last-child,
+    .term-table td:last-child {
+      padding-right: 25px;
+    }
+
+    .term-table-full {
+      flex: 1 1 auto;
+      margin-left: calc(var(--term-card-x) * -1);
+      margin-right: calc(var(--term-card-x) * -1);
+      min-height: 260px;
+      overflow-x: auto;
+      overflow-y: visible;
+      width: calc(100% + (var(--term-card-x) * 2));
+    }
+
+    .term-table {
+      min-width: 100%;
     }
 
     .term-work-title {
@@ -318,13 +359,50 @@
       padding: 8px 10px;
     }
 
+    .term-pagination {
+      align-items: center;
+      border-top: 1px solid #eef2f6;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 14px;
+    }
+
+    .term-pagination-info {
+      color: #697586;
+      font-size: 12px;
+    }
+
+    .term-pagination .pagination {
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: flex-end;
+      margin-bottom: 0;
+    }
+
+    .term-pagination .page-link {
+      border-radius: 6px;
+      min-width: 34px;
+      text-align: center;
+    }
+
     @media (max-width: 767.98px) {
+      .term-card-body {
+        --term-card-x: 16px;
+      }
+
       .term-filter-grid {
         grid-template-columns: 1fr;
       }
 
       .term-filter-grid .btn {
         width: 100%;
+      }
+
+      .term-pagination {
+        align-items: flex-start;
       }
     }
   </style>
@@ -333,7 +411,7 @@
 @section('content')
   <div class="row">
     <div class="col-12">
-      <div class="card">
+      <div class="card term-payment-card">
         <div class="card-header">
           <div class="row align-items-center">
             <div class="col">
@@ -342,7 +420,7 @@
             </div>
           </div>
         </div>
-        <div class="card-body pt-0">
+        <div class="card-body term-card-body pt-0">
           @if (session('status'))
             <div class="alert alert-success">{{ session('status') }}</div>
           @endif
@@ -438,7 +516,7 @@
             </div>
           </div>
 
-          <div class="table-responsive">
+          <div class="term-table-full">
             <table class="table table-hover term-table mb-0">
               <thead>
                 <tr>
@@ -500,24 +578,26 @@
                                     <span>Detail</span>
                                   </button>
                                 </li>
-                                <li>
-                                  <button
-                                    type="button"
-                                    class="dropdown-item term-payment-update-action"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#payment-update-detail-modal"
-                                    data-update-action="{{ route('termin-pembayaran.rincian.update', $payment['detail']['payment_term_id']) }}"
-                                    data-update-payment-number="{{ $payment['detail']['payment_number'] }}"
-                                    data-update-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
-                                    data-update-work-item-id="{{ $payment['detail']['work_item_id'] }}"
-                                    data-update-work-item-name="{{ $payment['detail']['work_item_name'] }}"
-                                    data-current-service-detail-id="{{ $payment['detail']['service_detail_id'] }}"
-                                    data-update-search-keyword="{{ $payment['detail']['search_keyword'] }}"
-                                  >
-                                    <i class="ti ti-edit"></i>
-                                    <span>Update Rincian</span>
-                                  </button>
-                                </li>
+                                @if ($row['can_update_service_detail'])
+                                  <li>
+                                    <button
+                                      type="button"
+                                      class="dropdown-item term-payment-update-action"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#payment-update-detail-modal"
+                                      data-update-action="{{ route('termin-pembayaran.rincian.update', $payment['detail']['payment_term_id']) }}"
+                                      data-update-payment-number="{{ $payment['detail']['payment_number'] }}"
+                                      data-update-amount="{{ $formatRupiah($payment['detail']['amount']) }}"
+                                      data-update-work-item-id="{{ $payment['detail']['work_item_id'] }}"
+                                      data-update-work-item-name="{{ $payment['detail']['work_item_name'] }}"
+                                      data-current-service-detail-id="{{ $payment['detail']['service_detail_id'] }}"
+                                      data-update-search-keyword="{{ $payment['detail']['search_keyword'] }}"
+                                    >
+                                      <i class="ti ti-edit"></i>
+                                      <span>Update Rincian</span>
+                                    </button>
+                                  </li>
+                                @endif
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                   <button
@@ -554,6 +634,17 @@
               </tbody>
             </table>
           </div>
+
+          @if ($rows->hasPages())
+            <div class="term-pagination">
+              <div class="term-pagination-info">
+                Menampilkan {{ $rows->firstItem() }}-{{ $rows->lastItem() }} dari {{ $rows->total() }} pekerjaan
+              </div>
+              <div>
+                {{ $rows->onEachSide(1)->links('pagination::bootstrap-5') }}
+              </div>
+            </div>
+          @endif
         </div>
       </div>
     </div>

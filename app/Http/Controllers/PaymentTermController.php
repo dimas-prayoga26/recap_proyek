@@ -13,6 +13,7 @@ use App\Models\WorkItem;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -72,20 +73,22 @@ class PaymentTermController extends Controller
             ->sort()
             ->values();
 
-        $rows = filled($filters['terms'] ?? null)
+        $filteredRows = filled($filters['terms'] ?? null)
             ? $allRows->filter(fn (array $row) => $row['summary']['total_terms'] === (int) $filters['terms'])->values()
             : $allRows;
         $paymentTotals = [
-            'offer' => (int) $rows->sum(fn (array $row): int => (int) $row['summary']['offer']),
-            'paid' => (int) $rows->sum(fn (array $row): int => (int) $row['summary']['paid']),
-            'remaining' => (int) $rows->sum(fn (array $row): int => max(0, (int) $row['summary']['remaining'])),
-            'row_count' => $rows->count(),
-            'payment_count' => (int) $rows->sum(fn (array $row): int => $row['payments']->count()),
+            'offer' => (int) $filteredRows->sum(fn (array $row): int => (int) $row['summary']['offer']),
+            'paid' => (int) $filteredRows->sum(fn (array $row): int => (int) $row['summary']['paid']),
+            'remaining' => (int) $filteredRows->sum(fn (array $row): int => max(0, (int) $row['summary']['remaining'])),
+            'row_count' => $filteredRows->count(),
+            'payment_count' => (int) $filteredRows->sum(fn (array $row): int => $row['payments']->count()),
         ];
 
         $maxTermsColumn = filled($filters['terms'] ?? null)
             ? (int) $filters['terms']
-            : max(1, (int) ($rows->max('summary.total_terms') ?: 1));
+            : max(1, (int) ($filteredRows->max('summary.total_terms') ?: 1));
+
+        $rows = $this->paginateRows($filteredRows, $request);
 
         return view('pages.payment-terms', [
             'title' => 'Rekap Pembayaran',
@@ -207,10 +210,12 @@ class PaymentTermController extends Controller
         return $workItems->map(function (WorkItem $workItem) {
             $paymentGroup = $workItem->paymentGroups->first();
             $summary = $this->paymentSummary($workItem, $paymentGroup);
+            $vendorName = $workItem->vendor?->name ?? '-';
 
             return [
                 'work_item' => $workItem,
-                'vendor_name' => $workItem->vendor?->name ?? '-',
+                'vendor_name' => $vendorName,
+                'can_update_service_detail' => $this->canUpdateServiceDetailFor($vendorName),
                 'payment_group' => $paymentGroup,
                 'summary' => $summary,
                 'payments' => $paymentGroup
@@ -225,6 +230,34 @@ class PaymentTermController extends Controller
                     : collect(),
             ];
         });
+    }
+
+    private function canUpdateServiceDetailFor(string $vendorName): bool
+    {
+        return str_starts_with(mb_strtolower(trim($vendorName)), 'jasa pasang');
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    private function paginateRows(Collection $rows, Request $request): LengthAwarePaginator
+    {
+        $perPage = 10;
+        $total = $rows->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $currentPage = min(max(1, (int) $request->integer('page', 1)), $lastPage);
+
+        return new LengthAwarePaginator(
+            $rows->forPage($currentPage, $perPage)->values(),
+            $total,
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => collect($request->query())->except('page')->all(),
+            ],
+        );
     }
 
     private function paymentDetail(PaymentTerm $term, WorkItem $workItem, PaymentGroup $paymentGroup): array

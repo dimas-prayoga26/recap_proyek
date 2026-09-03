@@ -8,6 +8,8 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
+Route::view('/login', 'pages.login')->name('login');
+
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 Route::post('/dashboard/active-project', [DashboardController::class, 'updateActiveProject'])->name('dashboard.active-project');
 
