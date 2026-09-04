@@ -40,7 +40,7 @@ class DashboardController extends Controller
         return view('dashboard', [
             'projects' => $projects,
             'activeProject' => $activeProject,
-            'projectBalances' => $this->projectBalances($projects),
+            'projectBalances' => $this->projectBalances($projects, $usdToIdrRate),
             'offerSummary' => $this->projectOfferSummary($activeProject, $usdToIdrRate),
             'summary' => [
                 'income' => $this->formatRupiahShort($income),
@@ -118,7 +118,7 @@ class DashboardController extends Controller
             ->sum('amount');
     }
 
-    private function projectBalances(Collection $projects): array
+    private function projectBalances(Collection $projects, float $usdToIdrRate): array
     {
         $balances = ProjectTransaction::query()
             ->select('project_id')
@@ -128,9 +128,20 @@ class DashboardController extends Controller
 
         return $projects
             ->mapWithKeys(fn (Project $project) => [
-                $project->id => $this->formatRupiahShort((int) ($balances[$project->id] ?? 0)),
+                $project->id => $this->formatProjectBalance((int) ($balances[$project->id] ?? 0), $usdToIdrRate),
             ])
             ->all();
+    }
+
+    private function formatProjectBalance(int $balance, float $usdToIdrRate): string
+    {
+        $label = $this->formatRupiahShort($balance);
+
+        if ($balance >= 0 || $usdToIdrRate <= 0) {
+            return $label;
+        }
+
+        return $label.' / '.$this->formatUsdShort(abs($balance) / $usdToIdrRate);
     }
 
     private function chartSeries(?Project $project): array

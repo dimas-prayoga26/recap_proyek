@@ -16,7 +16,7 @@ class ExchangeRateControllerTest extends TestCase
         Cache::forget('exchange-rate.usd-idr');
         Http::preventStrayRequests();
         Http::fake([
-            'api.currencyapi.net/*' => Http::response([
+            'currencyapi.net/*' => Http::response([
                 'valid' => true,
                 'base' => 'USD',
                 'rates' => ['IDR' => 17250],
@@ -41,7 +41,7 @@ class ExchangeRateControllerTest extends TestCase
         Cache::forget('exchange-rate.usd-idr');
         Http::preventStrayRequests();
         Http::fake([
-            'api.currencyapi.net/*' => Http::response([
+            'currencyapi.net/*' => Http::response([
                 'valid' => true,
                 'base' => 'USD',
                 'rates' => ['IDR' => 17250],

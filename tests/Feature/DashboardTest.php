@@ -24,7 +24,7 @@ class DashboardTest extends TestCase
         Cache::forget('exchange-rate.usd-idr');
         Http::preventStrayRequests();
         Http::fake([
-            'api.currencyapi.net/*' => Http::response([
+            'currencyapi.net/*' => Http::response([
                 'valid' => true,
                 'updated' => 1725264000,
                 'base' => 'USD',
@@ -85,7 +85,7 @@ class DashboardTest extends TestCase
         Cache::forget('exchange-rate.usd-idr');
         Http::preventStrayRequests();
         Http::fake([
-            'api.currencyapi.net/*' => Http::failedConnection(),
+            'currencyapi.net/*' => Http::failedConnection(),
         ]);
 
         $project = Project::create([
@@ -112,12 +112,49 @@ class DashboardTest extends TestCase
             ->assertSee('Kurs sekarang USD Rp 16.300');
     }
 
+    public function test_dashboard_project_switcher_shows_usd_equivalent_for_negative_balance(): void
+    {
+        Cache::put('exchange-rate.usd-idr', 17000, 300);
+
+        $project = Project::create([
+            'name' => 'Project Saldo Minus Dashboard',
+            'slug' => 'project-saldo-minus-dashboard-'.uniqid(),
+            'status' => 'active',
+        ]);
+        ActiveProjectSelection::updateOrCreate(
+            ['key' => 'dashboard'],
+            ['project_id' => $project->id],
+        );
+        $category = TransactionCategory::firstOrCreate(
+            ['name' => 'Operasional', 'type' => 'keluar'],
+            ['status' => 'active'],
+        );
+        $workItem = WorkItem::create([
+            'project_id' => $project->id,
+            'name' => 'Pekerjaan Saldo Minus',
+        ]);
+        ProjectTransaction::create([
+            'project_id' => $project->id,
+            'transaction_category_id' => $category->id,
+            'work_item_id' => $workItem->id,
+            'type' => 'keluar',
+            'amount' => 2100000,
+            'recorded_at' => '2026-09-04',
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response
+            ->assertOk()
+            ->assertSee('Saldo - Rp 2,1 jt / USD 124');
+    }
+
     public function test_paid_off_payment_group_uses_success_card_and_work_item_alias(): void
     {
         Cache::forget('exchange-rate.usd-idr');
         Http::preventStrayRequests();
         Http::fake([
-            'api.currencyapi.net/*' => Http::response([
+            'currencyapi.net/*' => Http::response([
                 'valid' => true,
                 'updated' => 1725264000,
                 'base' => 'USD',

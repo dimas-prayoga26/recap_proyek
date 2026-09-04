@@ -53,7 +53,7 @@
       </li>
       <li>
         <a class="dropdown-item" href="{{ route('laporan.index', ['export' => 'pdf']) }}" id="export-pdf-link">
-          <i class="ti ti-file-type-pdf me-2"></i> PDF
+          <i class="ti ti-file-text me-2"></i> PDF
         </a>
       </li>
     </ul>
@@ -675,9 +675,6 @@
             <div class="col-auto d-flex flex-wrap gap-2">
               <a href="{{ route('uang-keluar.index') }}" class="btn btn-primary">
                 <i class="ti ti-plus me-1"></i> Input Transaksi
-              </a>
-              <a href="{{ route('laporan.index') }}" class="btn btn-light-primary">
-                <i class="ti ti-file-export me-1"></i> Export Laporan
               </a>
             </div>
           </div>

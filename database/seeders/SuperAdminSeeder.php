@@ -15,15 +15,19 @@ class SuperAdminSeeder extends Seeder
         $users = [
             [
                 'name' => 'Super Admin',
-                'email' => 'superadmin@gmail.com',
+                'email' => 'superadmin@rumahgue.id',
             ],
             [
                 'name' => 'Lukman',
-                'email' => 'lukman@rnbmanagement.com',
+                'email' => 'lukman@rumahgue.id',
             ],
             [
                 'name' => 'Rexy',
-                'email' => 'rexy@andalanbersama.com',
+                'email' => 'rexy@rumahgue.id',
+            ],
+            [
+                'name' => 'admin',
+                'email' => 'admin@rumahgue.id',
             ],
         ];
 

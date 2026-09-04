@@ -36,7 +36,7 @@ return [
     ],
 
     'currencyapi' => [
-        'base_url' => env('CURRENCYAPI_BASE_URL', 'https://api.currencyapi.net'),
+        'base_url' => env('CURRENCYAPI_BASE_URL', 'https://currencyapi.net'),
         'key' => env('CURRENCYAPI_KEY'),
         'usd_idr_fallback_rate' => (float) env('USD_IDR_FALLBACK_RATE', 16300),
         'usd_idr_cache_ttl' => (int) env('USD_IDR_CACHE_TTL', 86400),
