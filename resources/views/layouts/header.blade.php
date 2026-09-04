@@ -55,17 +55,27 @@
           </a>
           <div class="dropdown-menu dropdown-user-profile dropdown-menu-end pc-h-dropdown">
             <div class="dropdown-header">
-              <h4>Halo, <span class="small text-muted">Admin</span></h4>
+              <h4>Halo, <span class="small text-muted">{{ auth()->user()?->name ?? 'Admin' }}</span></h4>
               <p class="text-muted">Project Finance</p>
               <hr />
               <a href="{{ route('pengaturan.index') }}" class="dropdown-item">
                 <i class="ti ti-settings"></i>
                 <span>Pengaturan Akun</span>
               </a>
-              <a href="#" class="dropdown-item">
-                <i class="ti ti-logout"></i>
-                <span>Logout</span>
-              </a>
+              @auth
+                <form method="POST" action="{{ route('logout') }}">
+                  @csrf
+                  <button type="submit" class="dropdown-item">
+                    <i class="ti ti-logout"></i>
+                    <span>Logout</span>
+                  </button>
+                </form>
+              @else
+                <a href="{{ route('login') }}" class="dropdown-item">
+                  <i class="ti ti-login"></i>
+                  <span>Login</span>
+                </a>
+              @endauth
             </div>
           </div>
         </li>

@@ -8,10 +8,11 @@ use Throwable;
 
 class ExchangeRateService
 {
+    private const CACHE_KEY = 'exchange-rate.usd-idr';
+
     public function usdToIdr(): float
     {
-        $cacheKey = 'exchange-rate.usd-idr';
-        $cachedRate = Cache::get($cacheKey);
+        $cachedRate = Cache::get(self::CACHE_KEY);
 
         if (is_numeric($cachedRate) && (float) $cachedRate > 0) {
             return (float) $cachedRate;
@@ -20,7 +21,7 @@ class ExchangeRateService
         $rate = $this->fetchUsdToIdr();
 
         if ($rate !== null) {
-            Cache::put($cacheKey, $rate, (int) config('services.frankfurter.usd_idr_cache_ttl', 300));
+            Cache::put(self::CACHE_KEY, $rate, (int) config('services.currencyapi.usd_idr_cache_ttl', 86400));
 
             return $rate;
         }
@@ -28,16 +29,21 @@ class ExchangeRateService
         return $this->fallbackUsdToIdrRate();
     }
 
+    public function forgetCachedRate(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+    }
+
     private function fetchUsdToIdr(): ?float
     {
         try {
-            $response = Http::baseUrl((string) config('services.frankfurter.base_url'))
+            $response = Http::baseUrl((string) config('services.currencyapi.base_url'))
                 ->connectTimeout(3)
                 ->timeout(5)
                 ->retry(2, 200)
-                ->get('/v2/rates', [
+                ->get('/api/v2/rates', [
+                    'key' => config('services.currencyapi.key'),
                     'base' => 'USD',
-                    'quotes' => 'IDR',
                 ]);
 
             if (! $response->successful()) {
@@ -55,7 +61,11 @@ class ExchangeRateService
      */
     private function rateFromPayload(array $payload): ?float
     {
-        $rate = data_get($payload, '0.rate') ?? data_get($payload, 'rates.IDR');
+        if (($payload['valid'] ?? true) === false) {
+            return null;
+        }
+
+        $rate = data_get($payload, 'rates.IDR');
 
         if (is_numeric($rate) && (float) $rate > 0) {
             return (float) $rate;
@@ -66,6 +76,6 @@ class ExchangeRateService
 
     private function fallbackUsdToIdrRate(): float
     {
-        return (float) config('services.frankfurter.usd_idr_fallback_rate', 16300);
+        return (float) config('services.currencyapi.usd_idr_fallback_rate', 16300);
     }
 }

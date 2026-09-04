@@ -30,6 +30,17 @@
       display: flex;
       flex-direction: column;
       min-height: calc(100vh - 250px);
+      position: relative;
+    }
+
+    .term-payment-card.is-loading::after {
+      background: rgba(255, 255, 255, 0.65);
+      border-radius: 8px;
+      content: '';
+      inset: 0;
+      pointer-events: none;
+      position: absolute;
+      z-index: 5;
     }
 
     .term-filter-grid {
@@ -411,7 +422,7 @@
 @section('content')
   <div class="row">
     <div class="col-12">
-      <div class="card term-payment-card">
+      <div class="card term-payment-card" id="payment-terms-panel">
         <div class="card-header">
           <div class="row align-items-center">
             <div class="col">
@@ -428,7 +439,7 @@
             <div class="alert alert-danger">{{ $errors->first() }}</div>
           @endif
 
-          <form method="GET" action="{{ route('termin-pembayaran.index') }}" class="term-filter-grid mb-4">
+          <form method="GET" action="{{ route('termin-pembayaran.index') }}" class="term-filter-grid mb-4" id="term-filter-form">
             <div>
               <label for="term-search" class="form-label">Search</label>
               <input type="search" class="form-control" id="term-search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Cari pekerjaan atau vendor..." />
@@ -790,6 +801,7 @@
 @endsection
 
 @push('scripts')
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const vendorInput = document.querySelector('#term-vendor');
@@ -1094,6 +1106,380 @@
       window.addEventListener('mouseup', function () {
         isPaymentDetailDragging = false;
         paymentDetailImage.classList.remove('is-dragging');
+      });
+    });
+  </script>
+  <script>
+    jQuery(function ($) {
+      const panelSelector = '#payment-terms-panel';
+      const filterFormSelector = '#term-filter-form';
+      let termAjaxRequest = null;
+      let termSearchTimer = null;
+
+      function buildFilterUrl(form) {
+        const $form = $(form);
+        const query = $form.serialize();
+
+        return $form.attr('action') + (query ? '?' + query : '');
+      }
+
+      function replacePaymentTermsPanel(html, fallbackUrl) {
+        const parsed = $('<div>').append($.parseHTML(html, document, true));
+        const nextPanel = parsed.find(panelSelector);
+
+        if (!nextPanel.length) {
+          window.location.href = fallbackUrl;
+
+          return;
+        }
+
+        $(panelSelector).html(nextPanel.html());
+      }
+
+      function loadPaymentTerms(url, shouldPushState = true) {
+        const panel = $(panelSelector);
+
+        if (!panel.length) {
+          window.location.href = url;
+
+          return;
+        }
+
+        if (termAjaxRequest) {
+          termAjaxRequest.abort();
+        }
+
+        panel.addClass('is-loading');
+
+        termAjaxRequest = $.ajax({
+          url,
+          method: 'GET',
+          dataType: 'html',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        })
+          .done(function (html) {
+            replacePaymentTermsPanel(html, url);
+
+            if (shouldPushState) {
+              window.history.pushState({ paymentTermsUrl: url }, '', url);
+            }
+          })
+          .fail(function (_xhr, status) {
+            if (status !== 'abort') {
+              window.location.href = url;
+            }
+          })
+          .always(function () {
+            $(panelSelector).removeClass('is-loading');
+            termAjaxRequest = null;
+          });
+      }
+
+      function submitPaymentTermsFilter() {
+        const form = document.querySelector(filterFormSelector);
+
+        if (form) {
+          loadPaymentTerms(buildFilterUrl(form));
+        }
+      }
+
+      function filterVendorOptions() {
+        const vendorSearch = $('#term-vendor-search');
+        const keyword = vendorSearch.val().trim().toLowerCase();
+        let visibleCount = 0;
+
+        $('.vendor-option').each(function () {
+          const option = $(this);
+          const isVisible = (option.data('search') || '').includes(keyword);
+
+          option.toggleClass('d-none', !isVisible);
+
+          if (isVisible) {
+            visibleCount++;
+          }
+        });
+
+        $('#term-vendor-empty').toggleClass('d-none', visibleCount > 0);
+      }
+
+      function getPaymentModalElements() {
+        const paymentDetailDownload = document.querySelector('#payment-detail-download');
+
+        return {
+          paymentDetailTitle: document.querySelector('#payment-detail-title'),
+          paymentDetailAmount: document.querySelector('#payment-detail-amount'),
+          paymentDetailDate: document.querySelector('#payment-detail-date'),
+          paymentDetailServiceRow: document.querySelector('#payment-detail-service-row'),
+          paymentDetailService: document.querySelector('#payment-detail-service'),
+          paymentDetailNotes: document.querySelector('#payment-detail-notes'),
+          paymentDetailEmpty: document.querySelector('#payment-detail-empty'),
+          paymentDetailPreview: document.querySelector('.payment-detail-preview'),
+          paymentDetailImage: document.querySelector('#payment-detail-image'),
+          paymentDetailPdf: document.querySelector('#payment-detail-pdf'),
+          paymentDetailDownload,
+          paymentDetailDownloadText: paymentDetailDownload ? paymentDetailDownload.querySelector('span') : null,
+        };
+      }
+
+      function setPaymentDetailZoomFromAjax(elements, value, pointerEvent = null) {
+        if (!elements.paymentDetailPreview || !elements.paymentDetailImage) {
+          return;
+        }
+
+        const previousZoom = Number(elements.paymentDetailImage.dataset.zoom || '1');
+        const previewRect = elements.paymentDetailPreview.getBoundingClientRect();
+        const pointerX = pointerEvent ? pointerEvent.clientX - previewRect.left : elements.paymentDetailPreview.clientWidth / 2;
+        const pointerY = pointerEvent ? pointerEvent.clientY - previewRect.top : elements.paymentDetailPreview.clientHeight / 2;
+        const scrollAnchorX = elements.paymentDetailPreview.scrollLeft + pointerX;
+        const scrollAnchorY = elements.paymentDetailPreview.scrollTop + pointerY;
+        const nextZoom = Math.min(5, Math.max(1, value));
+
+        elements.paymentDetailImage.dataset.zoom = String(nextZoom);
+        elements.paymentDetailPreview.classList.toggle('is-zoomed', nextZoom > 1);
+        elements.paymentDetailImage.classList.toggle('is-zoomed', nextZoom > 1);
+        elements.paymentDetailImage.style.width = nextZoom > 1 ? (nextZoom * 100) + '%' : '';
+
+        if (nextZoom <= 1) {
+          elements.paymentDetailImage.classList.remove('is-dragging');
+          elements.paymentDetailPreview.scrollLeft = 0;
+          elements.paymentDetailPreview.scrollTop = 0;
+        }
+
+        if (pointerEvent && previousZoom !== nextZoom) {
+          const zoomRatio = nextZoom / previousZoom;
+
+          elements.paymentDetailPreview.scrollLeft = (scrollAnchorX * zoomRatio) - pointerX;
+          elements.paymentDetailPreview.scrollTop = (scrollAnchorY * zoomRatio) - pointerY;
+        }
+      }
+
+      function resetPaymentReceiptPreviewFromAjax(elements) {
+        elements.paymentDetailEmpty.classList.add('d-none');
+        elements.paymentDetailImage.classList.add('d-none');
+        elements.paymentDetailPreview.classList.remove('is-zoomed');
+        elements.paymentDetailImage.classList.remove('is-zoomed', 'is-dragging');
+        elements.paymentDetailPdf.classList.add('d-none');
+        elements.paymentDetailDownload.classList.add('d-none');
+        elements.paymentDetailImage.removeAttribute('src');
+        elements.paymentDetailPdf.removeAttribute('src');
+        elements.paymentDetailImage.dataset.receiptName = '';
+        elements.paymentDetailImage.dataset.receiptUrl = '';
+        elements.paymentDetailImage.dataset.zoom = '1';
+        elements.paymentDetailImage.style.width = '';
+        elements.paymentDetailDownload.href = '#';
+        setPaymentDetailZoomFromAjax(elements, 1);
+      }
+
+      function showPaymentReceiptDownloadFromAjax(elements, receiptName) {
+        elements.paymentDetailDownload.classList.remove('d-none');
+        elements.paymentDetailDownloadText.textContent = receiptName ? 'Buka ' + receiptName : 'Buka Bukti Pembayaran';
+      }
+
+      function showPaymentReceiptFallbackFromAjax(elements, message, receiptName) {
+        elements.paymentDetailImage.classList.add('d-none');
+        elements.paymentDetailPdf.classList.add('d-none');
+        showPaymentReceiptDownloadFromAjax(elements, receiptName);
+
+        if (message) {
+          elements.paymentDetailEmpty.textContent = message;
+          elements.paymentDetailEmpty.classList.remove('d-none');
+        }
+      }
+
+      function selectRincianOption(option) {
+        const paymentUpdateDetailValue = document.querySelector('#payment-update-detail-value');
+        const paymentUpdateDetailLabel = document.querySelector('#payment-update-detail-label');
+        const paymentUpdateDetailOptions = Array.from(document.querySelectorAll('.rincian-detail-option'));
+
+        if (!option || !paymentUpdateDetailValue || !paymentUpdateDetailLabel) {
+          return;
+        }
+
+        paymentUpdateDetailValue.value = option.dataset.value || '';
+        paymentUpdateDetailLabel.textContent = option.dataset.label || 'Tanpa rincian';
+
+        paymentUpdateDetailOptions.forEach(function (item) {
+          item.classList.toggle('active', item === option);
+        });
+      }
+
+      function filterPaymentUpdateOptions() {
+        const paymentUpdateDetailSearch = document.querySelector('#payment-update-detail-search');
+        const paymentUpdateDetailEmpty = document.querySelector('#payment-update-detail-empty');
+        const paymentUpdateDetailOptions = Array.from(document.querySelectorAll('.rincian-detail-option'));
+
+        if (!paymentUpdateDetailSearch || !paymentUpdateDetailEmpty) {
+          return;
+        }
+
+        const keyword = paymentUpdateDetailSearch.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        paymentUpdateDetailOptions.forEach(function (option) {
+          const isBlocked = option.dataset.blocked === '1';
+          const matches = option.dataset.value === ''
+            || (option.dataset.search || option.textContent).toLowerCase().includes(keyword);
+          const isVisible = !isBlocked && matches;
+
+          option.classList.toggle('d-none', !isVisible);
+
+          if (isVisible) {
+            visibleCount++;
+          }
+        });
+
+        paymentUpdateDetailEmpty.classList.toggle('d-none', visibleCount > 0);
+      }
+
+      $(document).on('submit', filterFormSelector, function (event) {
+        event.preventDefault();
+        loadPaymentTerms(buildFilterUrl(this));
+      });
+
+      $(document).on('input', '#term-search', function () {
+        clearTimeout(termSearchTimer);
+        termSearchTimer = setTimeout(submitPaymentTermsFilter, 350);
+      });
+
+      $(document).on('change', '#term-count', submitPaymentTermsFilter);
+
+      $(document).on('input', '#term-vendor-search', filterVendorOptions);
+
+      $(document).on('shown.bs.dropdown', '#term-vendor-toggle', function () {
+        $('#term-vendor-search').trigger('focus');
+      });
+
+      $(document).on('click', '.vendor-option', function () {
+        const option = $(this);
+
+        $('#term-vendor').val(option.data('value') || '');
+        $('#term-vendor-label').text(option.data('label') || 'Semua Vendor');
+        $('.vendor-option').removeClass('active');
+        option.addClass('active');
+        $('#term-vendor-search').val('');
+        filterVendorOptions();
+
+        const toggle = document.querySelector('#term-vendor-toggle');
+
+        if (toggle) {
+          bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+        }
+
+        submitPaymentTermsFilter();
+      });
+
+      $(document).on('click', '#payment-terms-panel .term-pagination a', function (event) {
+        event.preventDefault();
+        loadPaymentTerms(this.href);
+      });
+
+      $(document).on('click', '.term-payment-detail-action', function () {
+        const button = this;
+        const elements = getPaymentModalElements();
+        const receiptUrl = button.dataset.receiptUrl || '';
+        const receiptMime = (button.dataset.receiptMime || '').toLowerCase();
+        const receiptName = button.dataset.receiptName || '';
+        const receiptPath = (receiptUrl || receiptName).toLowerCase();
+        const isPdf = receiptMime === 'application/pdf' || receiptPath.endsWith('.pdf');
+        const isImage = receiptMime.startsWith('image/') || /\.(jpe?g|png)$/i.test(receiptPath);
+
+        elements.paymentDetailTitle.textContent = 'Pembayaran ke-' + (button.dataset.paymentNumber || '-');
+        elements.paymentDetailAmount.textContent = button.dataset.amount || '-';
+        elements.paymentDetailDate.textContent = button.dataset.recordedAt || '-';
+        elements.paymentDetailService.textContent = button.dataset.serviceDetail || '-';
+        elements.paymentDetailServiceRow.classList.toggle('d-none', !button.dataset.serviceDetail);
+        elements.paymentDetailNotes.textContent = button.dataset.notes || '-';
+        resetPaymentReceiptPreviewFromAjax(elements);
+
+        if (!receiptUrl) {
+          elements.paymentDetailEmpty.textContent = 'Bukti belum ada.';
+          elements.paymentDetailEmpty.classList.remove('d-none');
+
+          return;
+        }
+
+        elements.paymentDetailDownload.href = receiptUrl;
+
+        if (isPdf) {
+          elements.paymentDetailPdf.src = receiptUrl;
+          elements.paymentDetailPdf.classList.remove('d-none');
+          showPaymentReceiptDownloadFromAjax(elements, receiptName);
+
+          return;
+        }
+
+        if (isImage) {
+          elements.paymentDetailImage.dataset.receiptName = receiptName;
+          elements.paymentDetailImage.dataset.receiptUrl = receiptUrl;
+          elements.paymentDetailImage.src = receiptUrl;
+          elements.paymentDetailImage.classList.remove('d-none');
+
+          return;
+        }
+
+        showPaymentReceiptFallbackFromAjax(elements, 'Preview tidak tersedia untuk tipe file ini.', receiptName);
+      });
+
+      $(document).on('click', '.term-payment-update-action', function () {
+        const button = this;
+        const paymentUpdateDetailForm = document.querySelector('#payment-update-detail-form');
+        const paymentUpdateDetailSummary = document.querySelector('#payment-update-detail-summary');
+        const paymentUpdateWorkItem = document.querySelector('#payment-update-work-item');
+        const paymentUpdateDetailSearch = document.querySelector('#payment-update-detail-search');
+        const paymentUpdateDetailOptions = Array.from(document.querySelectorAll('.rincian-detail-option'));
+        const blockedWorkItemId = button.dataset.updateWorkItemId || '';
+        const currentServiceDetailId = button.dataset.currentServiceDetailId || '';
+
+        paymentUpdateDetailForm.action = button.dataset.updateAction || '#';
+        paymentUpdateDetailSummary.textContent = 'Pembayaran ke-' + (button.dataset.updatePaymentNumber || '-') + ' - ' + (button.dataset.updateAmount || '-');
+        paymentUpdateWorkItem.textContent = button.dataset.updateWorkItemName || '-';
+        paymentUpdateDetailSearch.value = button.dataset.updateSearchKeyword || '';
+
+        paymentUpdateDetailOptions.forEach(function (option) {
+          option.dataset.blocked = option.dataset.value && option.dataset.value === blockedWorkItemId ? '1' : '0';
+        });
+
+        const currentOption = paymentUpdateDetailOptions.find(function (option) {
+          return option.dataset.value === currentServiceDetailId;
+        });
+
+        selectRincianOption(currentOption?.dataset.blocked === '1' ? paymentUpdateDetailOptions[0] : (currentOption || paymentUpdateDetailOptions[0]));
+        filterPaymentUpdateOptions();
+      });
+
+      $(document).on('click', '.rincian-detail-option', function () {
+        if (this.dataset.blocked === '1') {
+          return;
+        }
+
+        selectRincianOption(this);
+
+        const toggle = document.querySelector('#payment-update-detail-toggle');
+
+        if (toggle) {
+          bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+        }
+      });
+
+      $(document).on('input', '#payment-update-detail-search', filterPaymentUpdateOptions);
+
+      $(document).on('shown.bs.dropdown', '#payment-update-detail-toggle', function () {
+        $('#payment-update-detail-search').trigger('focus');
+      });
+
+      $(document).on('click', '.term-payment-delete-action', function () {
+        const button = this;
+        const paymentDeleteForm = document.querySelector('#payment-delete-form');
+        const paymentDeleteSummary = document.querySelector('#payment-delete-summary');
+
+        paymentDeleteForm.action = button.dataset.deleteAction || '#';
+        paymentDeleteSummary.textContent = 'Hapus pembayaran ke-' + (button.dataset.deletePaymentNumber || '-') + ' sebesar ' + (button.dataset.deleteAmount || '-') + '?';
+      });
+
+      window.addEventListener('popstate', function () {
+        loadPaymentTerms(window.location.href, false);
       });
     });
   </script>

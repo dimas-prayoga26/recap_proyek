@@ -8,7 +8,7 @@
     <meta name="description" content="Masuk ke sistem pencatatan credit dan debit project." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
-    <link rel="icon" href="{{ asset('assets/berry/images/favicon.svg') }}" type="image/x-icon" />
+    <link rel="icon" href="{{ asset('assets/berry/images/app-favicon.svg') }}" type="image/svg+xml" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" id="main-font-link" />
     <link rel="stylesheet" href="{{ asset('assets/berry/fonts/phosphor/duotone/style.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/berry/fonts/tabler-icons.min.css') }}" />
@@ -101,47 +101,51 @@
                   <small>Keuangan Proyek</small>
                 </span>
               </a>
-
-              <div class="row">
-                <div class="d-flex justify-content-center">
-                  <div class="auth-header">
-                    <h2 class="text-secondary mt-5"><b>Selamat Datang</b></h2>
-                    <p class="f-16 mt-2">Masuk untuk lanjut mengelola transaksi proyek.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="d-grid">
-                <button type="button" class="btn mt-2 bg-light-primary bg-light text-muted">
-                  <img src="{{ asset('assets/berry/images/authentication/google-icon.svg') }}" alt="" />
-                  Masuk dengan Google
-                </button>
-              </div>
-
-              <div class="saprator mt-3">
-                <span>atau</span>
-              </div>
-
+              
               <h5 class="my-4 d-flex justify-content-center">Masuk dengan email</h5>
 
-              <form method="POST" action="#">
+              <form method="POST" action="{{ route('login.store') }}">
                 @csrf
                 <div class="form-floating mb-3">
-                  <input type="email" class="form-control" id="email" name="email" placeholder="Email" autocomplete="email" />
+                  <input
+                    type="email"
+                    class="form-control @error('email') is-invalid @enderror"
+                    id="email"
+                    name="email"
+                    value="{{ old('email') }}"
+                    placeholder="Email"
+                    autocomplete="email"
+                    required
+                    autofocus
+                  />
                   <label for="email">Email</label>
+                  @error('email')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
                 <div class="form-floating mb-3">
-                  <input type="password" class="form-control" id="password" name="password" placeholder="Password" autocomplete="current-password" />
+                  <input
+                    type="password"
+                    class="form-control @error('password') is-invalid @enderror"
+                    id="password"
+                    name="password"
+                    placeholder="Password"
+                    autocomplete="current-password"
+                    required
+                  />
                   <label for="password">Password</label>
+                  @error('password')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
                 <div class="d-flex mt-1 justify-content-between">
                   <div class="form-check">
-                    <input class="form-check-input input-primary" type="checkbox" id="remember" name="remember" checked />
+                    <input class="form-check-input input-primary" type="checkbox" id="remember" name="remember" value="1" @checked(old('remember', true)) />
                     <label class="form-check-label text-muted" for="remember">Ingat saya</label>
                   </div>
                 </div>
                 <div class="d-grid mt-4">
-                  <button type="button" class="btn btn-secondary login-submit">
+                  <button type="submit" class="btn btn-primary login-submit">
                     <i class="ti ti-login"></i>
                     Masuk
                   </button>

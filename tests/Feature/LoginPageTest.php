@@ -6,6 +6,8 @@ use Tests\TestCase;
 
 class LoginPageTest extends TestCase
 {
+    protected bool $authenticateRequests = false;
+
     public function test_login_page_renders_berry_login_component(): void
     {
         $response = $this->get(route('login'));
@@ -14,11 +16,12 @@ class LoginPageTest extends TestCase
             ->assertSee('Login | Pencatatan Proyek')
             ->assertSee('auth-main', false)
             ->assertSee('auth-wrapper v3', false)
-            ->assertSee('Masuk dengan Google')
-            ->assertSee('assets/berry/images/authentication/google-icon.svg', false)
+            ->assertSee('Masuk dengan email')
+            ->assertSee('action="'.route('login.store').'"', false)
             ->assertSee('assets/berry/css/style.css', false)
             ->assertSee('name="_token"', false)
             ->assertSee('type="password"', false)
+            ->assertSee('type="submit"', false)
             ->assertDontSee('pc-sidebar', false)
             ->assertDontSee('pc-header', false);
     }

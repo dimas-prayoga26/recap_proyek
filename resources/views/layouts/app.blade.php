@@ -8,7 +8,7 @@
     <meta name="description" content="Sistem pencatatan credit dan debit untuk project." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
-    <link rel="icon" href="{{ asset('assets/berry/images/favicon.svg') }}" type="image/x-icon" />
+    <link rel="icon" href="{{ asset('assets/berry/images/app-favicon.svg') }}" type="image/svg+xml" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" id="main-font-link" />
     <link rel="stylesheet" href="{{ asset('assets/berry/fonts/phosphor/duotone/style.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/berry/fonts/tabler-icons.min.css') }}" />

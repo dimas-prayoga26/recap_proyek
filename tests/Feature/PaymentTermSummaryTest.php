@@ -188,6 +188,10 @@ class PaymentTermSummaryTest extends TestCase
 
         $firstPage
             ->assertSee('term-table-full', false)
+            ->assertSee('id="payment-terms-panel"', false)
+            ->assertSee('id="term-filter-form"', false)
+            ->assertSee('$.ajax', false)
+            ->assertSee("$(document).on('click', '#payment-terms-panel .term-pagination a'", false)
             ->assertSee('Menampilkan 1-10 dari 13 pekerjaan')
             ->assertSee('<span class="term-work-title">Pekerjaan Paginate 00</span>', false)
             ->assertSee('<span class="term-work-title">Pekerjaan Paginate 09</span>', false)
@@ -299,7 +303,7 @@ class PaymentTermSummaryTest extends TestCase
             ->assertDontSee('id="payment-detail-zoom-in"', false)
             ->assertDontSee('id="payment-detail-zoom-out"', false)
             ->assertSee('data-amount="Rp 2.500.000"', false)
-            ->assertSee('data-recorded-at="29 August 2026"', false)
+            ->assertSee('data-recorded-at="Sabtu, 29 August 2026"', false)
             ->assertSee('data-service-detail="Marmer Family Room lantai 2"', false)
             ->assertSee('id="payment-detail-service-row"', false)
             ->assertSee('id="payment-detail-service"', false)

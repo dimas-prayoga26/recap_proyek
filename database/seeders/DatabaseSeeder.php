@@ -25,6 +25,9 @@ class DatabaseSeeder extends Seeder
             ])->toArray(),
         );
 
-        $this->call(ProjectFinanceSeeder::class);
+        $this->call([
+            SuperAdminSeeder::class,
+            ProjectFinanceSeeder::class,
+        ]);
     }
 }

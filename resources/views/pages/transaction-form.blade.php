@@ -1618,11 +1618,9 @@
 
       async function fetchUsdRate() {
         try {
-          const response = await fetch('https://api.frankfurter.dev/v2/rates?base=USD&quotes=IDR', { cache: 'no-store' });
+          const response = await fetch('{{ route('kurs.usd-idr') }}', { cache: 'no-store' });
           const data = await response.json();
-          const rate = Array.isArray(data)
-            ? Number(data[0] ? data[0].rate : 0)
-            : Number(data && data.rates ? data.rates.IDR : 0);
+          const rate = Number(data && data.rate ? data.rate : 0);
 
           if (rate > 0) {
             usdToIdrRate = rate;

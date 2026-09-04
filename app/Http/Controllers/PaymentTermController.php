@@ -356,7 +356,20 @@ class PaymentTermController extends Controller
             return '-';
         }
 
-        return $date->format('d F Y');
+        return $this->dayName($date).', '.$date->format('d F Y');
+    }
+
+    private function dayName(CarbonInterface $date): string
+    {
+        return [
+            'Minggu',
+            'Senin',
+            'Selasa',
+            'Rabu',
+            'Kamis',
+            'Jumat',
+            'Sabtu',
+        ][$date->dayOfWeek];
     }
 
     private function paymentSummary(?WorkItem $workItem, ?PaymentGroup $paymentGroup): array
